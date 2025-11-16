@@ -10,6 +10,7 @@ export class AnthropicService {
       apiKey,
       defaultHeaders: {
         "anthropic-version": "2023-06-01",
+        "anthropic-beta": "prompt-caching-2024-07-31",
       },
     });
     this.model = model;
@@ -18,11 +19,23 @@ export class AnthropicService {
   /**
    * Ask Claude to analyze code and provide a specific fix suggestion
    */
-  async analyzeSuggestion(prompt: string): Promise<AIServiceResponse | null> {
+  async analyzeSuggestion(
+    prompt: string,
+    systemPrompt?: string,
+  ): Promise<AIServiceResponse | null> {
     try {
       const response = await this.client.messages.create({
         model: this.model,
         max_tokens: 2048,
+        system: systemPrompt
+          ? [
+              {
+                type: "text",
+                text: systemPrompt,
+                cache_control: { type: "ephemeral" } as any, // Type cast for beta feature
+              },
+            ]
+          : undefined,
         messages: [
           {
             role: "user",
@@ -30,7 +43,7 @@ export class AnthropicService {
           },
         ],
         temperature: 0.3, // Lower temperature for more consistent code suggestions
-      });
+      } as any); // Type cast for beta feature
 
       const content = response.content[0];
       if (content.type !== "text") {
