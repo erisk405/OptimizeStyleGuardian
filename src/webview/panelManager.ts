@@ -207,45 +207,48 @@ export class PanelManager {
         }
 
         body {
-            font-family: var(--vscode-font-family);
-            font-size: var(--vscode-font-size);
-            color: var(--vscode-foreground);
-            background-color: var(--vscode-editor-background);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-size: 13px;
+            color: #e1e1e1;
+            background: #0a0a0a;
             padding: 20px;
+            line-height: 1.5;
         }
 
         h1 {
-            font-size: 24px;
+            font-size: 20px;
+            font-weight: 600;
             margin-bottom: 20px;
-            color: var(--vscode-foreground);
+            color: #ffffff;
+            letter-spacing: -0.3px;
         }
 
         .tabs {
             display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            border-bottom: 1px solid var(--vscode-panel-border);
+            gap: 0;
+            margin-bottom: 16px;
+            border-bottom: 1px solid #2a2a2a;
         }
 
         .tab {
-            padding: 10px 20px;
+            padding: 8px 16px;
             cursor: pointer;
             background: transparent;
             border: none;
-            color: var(--vscode-foreground);
-            opacity: 0.6;
-            font-size: 14px;
+            color: #888888;
+            font-size: 13px;
+            font-weight: 500;
             border-bottom: 2px solid transparent;
-            transition: all 0.2s;
+            transition: all 0.2s ease;
         }
 
         .tab:hover {
-            opacity: 0.8;
+            color: #e1e1e1;
         }
 
         .tab.active {
-            opacity: 1;
-            border-bottom-color: var(--vscode-button-background);
+            color: #ffffff;
+            border-bottom-color: #ffffff;
         }
 
         .tab-content {
@@ -257,258 +260,282 @@ export class PanelManager {
         }
 
         .summary {
-            background: var(--vscode-editor-inactiveSelectionBackground);
-            padding: 15px;
-            border-radius: 5px;
-            margin-bottom: 20px;
+            background: #141414;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
             display: flex;
-            gap: 30px;
+            gap: 32px;
             flex-wrap: wrap;
+            border: 1px solid #2a2a2a;
         }
 
         .summary-item {
             display: flex;
             flex-direction: column;
+            gap: 4px;
         }
 
         .summary-label {
-            font-size: 12px;
-            opacity: 0.7;
-            margin-bottom: 5px;
+            font-size: 11px;
+            color: #888888;
+            font-weight: 500;
         }
 
         .summary-value {
-            font-size: 20px;
-            font-weight: bold;
+            font-size: 24px;
+            font-weight: 600;
+            color: #ffffff;
         }
 
         .summary-value.critical {
-            color: var(--vscode-errorForeground);
+            color: #ef4444;
         }
 
         .summary-value.warning {
-            color: var(--vscode-list-warningForeground);
+            color: #f59e0b;
         }
 
         .issue-list {
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 12px;
         }
 
         .issue-card {
-            background: var(--vscode-editor-inactiveSelectionBackground);
-            padding: 15px;
-            border-radius: 5px;
-            border-left: 3px solid;
+            background: #141414;
+            padding: 16px;
+            border-radius: 8px;
+            border-left: 2px solid #2a2a2a;
+            border: 1px solid #2a2a2a;
+            transition: border-color 0.2s ease;
+        }
+
+        .issue-card:hover {
+            border-color: #3a3a3a;
         }
 
         .issue-card.critical {
-            border-left-color: var(--vscode-errorForeground);
+            border-left-color: #ef4444;
         }
 
         .issue-card.warning {
-            border-left-color: var(--vscode-list-warningForeground);
+            border-left-color: #f59e0b;
         }
 
         .issue-card.info {
-            border-left-color: var(--vscode-notificationsInfoIcon-foreground);
+            border-left-color: #6366f1;
         }
 
         .issue-header {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
+            gap: 12px;
         }
 
         .issue-title {
-            font-weight: bold;
-            font-size: 14px;
+            font-weight: 500;
+            font-size: 13px;
+            color: #ffffff;
+            line-height: 1.5;
+            flex: 1;
         }
 
         .severity-badge {
             padding: 2px 8px;
-            border-radius: 3px;
-            font-size: 11px;
-            font-weight: bold;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 500;
             text-transform: uppercase;
+            letter-spacing: 0.3px;
         }
 
         .severity-badge.critical {
-            background: var(--vscode-errorForeground);
-            color: var(--vscode-editor-background);
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
         }
 
         .severity-badge.warning {
-            background: var(--vscode-list-warningForeground);
-            color: var(--vscode-editor-background);
+            background: rgba(245, 158, 11, 0.15);
+            color: #f59e0b;
         }
 
         .severity-badge.info {
-            background: var(--vscode-notificationsInfoIcon-foreground);
-            color: var(--vscode-editor-background);
+            background: rgba(99, 102, 241, 0.15);
+            color: #6366f1;
         }
 
         .issue-details {
-            font-size: 13px;
-            margin-bottom: 10px;
-            opacity: 0.9;
+            font-size: 12px;
+            margin-bottom: 8px;
+            color: #a1a1a1;
+            line-height: 1.5;
         }
 
         .issue-location {
-            font-size: 12px;
-            opacity: 0.7;
-            margin-bottom: 10px;
-            font-family: var(--vscode-editor-font-family);
+            font-size: 11px;
+            color: #6b7280;
+            margin-bottom: 12px;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
         }
 
         .issue-actions {
             display: flex;
-            gap: 10px;
+            gap: 8px;
+            flex-wrap: wrap;
         }
 
         .btn {
             padding: 6px 12px;
-            border: none;
-            border-radius: 3px;
+            border: 1px solid #2a2a2a;
+            border-radius: 6px;
             cursor: pointer;
             font-size: 12px;
-            transition: opacity 0.2s;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            background: transparent;
         }
 
         .btn:hover {
-            opacity: 0.8;
+            border-color: #3a3a3a;
+            background: #1a1a1a;
         }
 
         .btn-primary {
-            background: var(--vscode-button-background);
-            color: var(--vscode-button-foreground);
+            color: #ffffff;
         }
 
         .btn-secondary {
-            background: var(--vscode-button-secondaryBackground);
-            color: var(--vscode-button-secondaryForeground);
+            color: #a1a1a1;
         }
 
         .empty-state {
             text-align: center;
             padding: 60px 20px;
-            opacity: 0.6;
+            color: #6b7280;
         }
 
         .empty-state-icon {
             font-size: 48px;
-            margin-bottom: 20px;
+            margin-bottom: 12px;
+            opacity: 0.4;
         }
 
         .empty-state-text {
-            font-size: 16px;
+            font-size: 13px;
+            color: #888888;
         }
 
         code {
-            background: var(--vscode-textCodeBlock-background);
+            background: #1a1a1a;
+            color: #e1e1e1;
             padding: 2px 6px;
-            border-radius: 3px;
-            font-family: var(--vscode-editor-font-family);
+            border-radius: 4px;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
             font-size: 12px;
+            border: 1px solid #2a2a2a;
         }
 
         /* AI Suggestion Styles */
         .ai-suggestion {
-            margin-top: 15px;
-            padding: 15px;
-            background: var(--vscode-textBlockQuote-background);
-            border-left: 3px solid #9b59b6;
-            border-radius: 5px;
+            margin-top: 12px;
+            padding: 12px;
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 6px;
         }
 
         .ai-badge {
             display: inline-flex;
             align-items: center;
-            gap: 5px;
+            gap: 6px;
             font-size: 11px;
-            font-weight: bold;
-            color: #9b59b6;
-            margin-bottom: 10px;
-            text-transform: uppercase;
+            font-weight: 500;
+            color: #ffffff;
+            margin-bottom: 8px;
         }
 
         .ai-explanation {
-            font-size: 13px;
-            margin-bottom: 15px;
+            font-size: 12px;
+            margin-bottom: 12px;
             line-height: 1.5;
+            color: #a1a1a1;
         }
 
         .code-diff {
-            margin: 15px 0;
+            margin: 12px 0;
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 8px;
         }
 
         .code-block {
-            background: var(--vscode-editor-background);
-            border: 1px solid var(--vscode-panel-border);
-            border-radius: 3px;
+            background: #0a0a0a;
+            border: 1px solid #2a2a2a;
+            border-radius: 6px;
             padding: 10px;
         }
 
         .code-block .label {
             display: block;
-            font-size: 11px;
-            font-weight: bold;
-            margin-bottom: 5px;
-            opacity: 0.7;
+            font-size: 10px;
+            font-weight: 500;
+            margin-bottom: 6px;
+            color: #888888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .code-block.before .label {
-            color: var(--vscode-errorForeground);
+            color: #ef4444;
         }
 
         .code-block.after .label {
-            color: var(--vscode-testing-iconPassed);
+            color: #10b981;
         }
 
         .code-block pre {
             margin: 0;
             padding: 0;
-            font-family: var(--vscode-editor-font-family);
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
             font-size: 12px;
             line-height: 1.5;
             white-space: pre-wrap;
             word-break: break-word;
+            color: #e1e1e1;
         }
 
         .ai-reasoning {
-            font-size: 12px;
-            opacity: 0.8;
-            margin-top: 10px;
+            font-size: 11px;
+            color: #888888;
+            margin-top: 8px;
             font-style: italic;
         }
 
         .confidence-badge {
             display: inline-block;
             padding: 2px 6px;
-            border-radius: 3px;
-            font-size: 10px;
-            font-weight: bold;
-            margin-left: 5px;
+            border-radius: 4px;
+            font-size: 9px;
+            font-weight: 500;
+            margin-left: 6px;
         }
 
         .confidence-badge.high {
-            background: var(--vscode-testing-iconPassed);
-            color: var(--vscode-editor-background);
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981;
         }
 
         .confidence-badge.medium {
-            background: var(--vscode-list-warningForeground);
-            color: var(--vscode-editor-background);
+            background: rgba(245, 158, 11, 0.15);
+            color: #f59e0b;
         }
 
         .confidence-badge.low {
-            background: var(--vscode-errorForeground);
-            color: var(--vscode-editor-background);
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
         }
     </style>
 </head>
