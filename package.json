@@ -39,6 +39,14 @@
       {
         "command": "go5StyleGuardian.configureApiKey",
         "title": "Go5: Configure Anthropic API Key"
+      },
+      {
+        "command": "go5StyleGuardian.installGitHook",
+        "title": "Go5: Install Git Pre-Commit Hook"
+      },
+      {
+        "command": "go5StyleGuardian.uninstallGitHook",
+        "title": "Go5: Uninstall Git Pre-Commit Hook"
       }
     ],
     "menus": {
@@ -146,6 +154,26 @@
           "minimum": 2,
           "maximum": 20,
           "description": "Number of lines of code context to send to AI around the issue"
+        },
+        "go5StyleGuardian.gitHook.autoInstall": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically install pre-commit hook when opening a workspace"
+        },
+        "go5StyleGuardian.gitHook.blockOnCritical": {
+          "type": "boolean",
+          "default": true,
+          "description": "Block commits if critical issues are found"
+        },
+        "go5StyleGuardian.gitHook.blockOnError": {
+          "type": "boolean",
+          "default": false,
+          "description": "Block commits if any errors are found (less strict than critical)"
+        },
+        "go5StyleGuardian.gitHook.showWarnings": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show warnings during commit (won't block commit)"
         }
       }
     }

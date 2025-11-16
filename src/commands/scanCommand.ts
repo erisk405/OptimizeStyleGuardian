@@ -18,7 +18,21 @@ export class ScanCommand {
     this.rustBridge = new RustBridge(context);
   }
 
-  async scanCurrentFile() {
+  async scanCurrentFile(uri?: vscode.Uri) {
+    // If URI is provided (from context menu), use it directly
+    if (uri) {
+      const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
+
+      if (!workspaceFolder) {
+        vscode.window.showWarningMessage("File is not in a workspace");
+        return;
+      }
+
+      await this.performScan([uri.fsPath], workspaceFolder.uri.fsPath);
+      return;
+    }
+
+    // Otherwise, use active editor (from command palette)
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
       vscode.window.showWarningMessage("No file is currently open");
