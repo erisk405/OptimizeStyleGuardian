@@ -1,0 +1,15 @@
+.vscode/**
+.vscode-test/**
+src/**
+.gitignore
+.yarnrc
+vsc-extension-quickstart.md
+**/tsconfig.json
+**/.eslintrc.json
+**/*.map
+**/*.ts
+engine/src/**
+engine/Cargo.toml
+engine/target/**
+!engine/target/release/go5_engine
+!engine/target/release/go5_engine.exe

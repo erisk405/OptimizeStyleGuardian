@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <!-- Missing viewport meta tag - should be flagged -->
+    <title>Design System Test</title>
+</head>
+<body>
+    <!-- Native button - should suggest go5-button -->
+    <button type="button">Click Me</button>
+    <button type="submit">Submit Form</button>
+
+    <!-- Native input - should suggest go5-input -->
+    <input type="text" placeholder="Enter text">
+    <input type="email" placeholder="Enter email">
+
+    <!-- Custom div with "card" class - should suggest go5-card -->
+    <div class="card">
+        <div class="card-body">
+            <h3 class="card-title">Card Title</h3>
+            <p>Card content</p>
+        </div>
+    </div>
+
+    <!-- Elements with btn keyword - should suggest go5-button -->
+    <div class="btn-primary">Custom Button</div>
+    <a href="#" class="btn-link">Link Button</a>
+
+    <!-- Images without lazy loading - should be flagged -->
+    <img src="banner.jpg" alt="Banner">
+    <img src="hero.png" alt="Hero">
+
+    <!-- Image missing dimensions (CLS risk) - should be flagged -->
+    <img src="profile.jpg" alt="Profile">
+
+    <!-- Proper image (should not be flagged) -->
+    <img src="logo.png" alt="Logo" width="200" height="50" loading="lazy">
+
+    <!-- Synchronous external script (render-blocking) - should be flagged -->
+    <script src="https://cdn.example.com/library.js"></script>
+
+    <!-- Proper async script (should not be flagged) -->
+    <script src="app.js" defer></script>
+
+    <!-- Heavy Angular Material components - should be flagged -->
+    <mat-table [dataSource]="dataSource">
+        <ng-container matColumnDef="name">
+            <mat-header-cell *matHeaderCellDef>Name</mat-header-cell>
+            <mat-cell *matCellDef="let element">{{element.name}}</mat-cell>
+        </ng-container>
+    </mat-table>
+
+    <!-- Excessive mat-icon usage - should be flagged if more than 10 -->
+    <mat-icon>home</mat-icon>
+    <mat-icon>settings</mat-icon>
+    <mat-icon>search</mat-icon>
+    <mat-icon>person</mat-icon>
+    <mat-icon>mail</mat-icon>
+    <mat-icon>favorite</mat-icon>
+    <mat-icon>shopping_cart</mat-icon>
+    <mat-icon>notifications</mat-icon>
+    <mat-icon>help</mat-icon>
+    <mat-icon>dashboard</mat-icon>
+    <mat-icon>edit</mat-icon>
+    <mat-icon>delete</mat-icon>
+
+    <!-- Correct usage of design system component (should not be flagged) -->
+    <go5-button variant="primary">Design System Button</go5-button>
+    <go5-input label="Email" type="email"></go5-input>
+    <go5-card>
+        <h3>Proper Card</h3>
+        <p>Using design system component</p>
+    </go5-card>
+</body>
+</html>

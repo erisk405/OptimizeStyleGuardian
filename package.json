@@ -1,0 +1,138 @@
+{
+  "name": "go5-style-guardian",
+  "displayName": "Go5 Style Guardian",
+  "description": "Frontend style analyzer with duplicate detection, design system enforcement, and Lighthouse performance tuning",
+  "version": "0.1.0",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Linters",
+    "Formatters",
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:go5StyleGuardian.scanCurrentFile",
+    "onCommand:go5StyleGuardian.scanSelectedFolder",
+    "onCommand:go5StyleGuardian.scanWorkspace",
+    "onCommand:go5StyleGuardian.openPanel"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "go5StyleGuardian.scanCurrentFile",
+        "title": "Go5: Scan Current File"
+      },
+      {
+        "command": "go5StyleGuardian.scanSelectedFolder",
+        "title": "Go5: Scan Selected Folder"
+      },
+      {
+        "command": "go5StyleGuardian.scanWorkspace",
+        "title": "Go5: Scan Workspace"
+      },
+      {
+        "command": "go5StyleGuardian.openPanel",
+        "title": "Go5: Open Style Guardian Panel"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "go5StyleGuardian.scanSelectedFolder",
+          "when": "explorerResourceIsFolder",
+          "group": "go5guardian@1"
+        },
+        {
+          "command": "go5StyleGuardian.scanCurrentFile",
+          "when": "!explorerResourceIsFolder",
+          "group": "go5guardian@1"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Go5 Style Guardian",
+      "properties": {
+        "go5StyleGuardian.duplicateSimilarityThreshold": {
+          "type": "number",
+          "default": 90,
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Threshold percentage for duplicate style detection (0-100)"
+        },
+        "go5StyleGuardian.performanceJsBundleThreshold": {
+          "type": "number",
+          "default": 200,
+          "description": "JavaScript bundle size threshold in KB"
+        },
+        "go5StyleGuardian.performanceCssSizeThreshold": {
+          "type": "number",
+          "default": 100,
+          "description": "CSS file size threshold in KB"
+        },
+        "go5StyleGuardian.performanceImageSizeThreshold": {
+          "type": "number",
+          "default": 500,
+          "description": "Image file size threshold in KB"
+        },
+        "go5StyleGuardian.designSystemConfigPath": {
+          "type": "string",
+          "default": "config/design-system.yml",
+          "description": "Path to design system YAML configuration file (relative to workspace root)"
+        },
+        "go5StyleGuardian.enabledCategories": {
+          "type": "object",
+          "default": {
+            "duplicateStyles": true,
+            "designSystem": true,
+            "performance": true
+          },
+          "description": "Enable or disable specific analysis categories"
+        },
+        "go5StyleGuardian.filePatterns": {
+          "type": "array",
+          "default": [
+            "**/*.css",
+            "**/*.scss",
+            "**/*.html",
+            "**/*.ts",
+            "**/*.js",
+            "**/*.jsx",
+            "**/*.tsx",
+            "**/*.vue"
+          ],
+          "description": "File patterns to include in scanning"
+        },
+        "go5StyleGuardian.excludePatterns": {
+          "type": "array",
+          "default": [
+            "**/node_modules/**",
+            "**/dist/**",
+            "**/build/**",
+            "**/.git/**"
+          ],
+          "description": "File patterns to exclude from scanning"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "build:engine": "cd engine && cargo build --release"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "eslint": "^8.54.0",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {}
+}

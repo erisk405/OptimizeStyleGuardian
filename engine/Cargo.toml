@@ -1,0 +1,47 @@
+[package]
+name = "go5_engine"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "go5_engine"
+path = "src/main.rs"
+
+[dependencies]
+# Command line argument parsing
+clap = { version = "4.4", features = ["derive"] }
+
+# CSS parsing
+lightningcss = "1.0.0-alpha.68"
+
+# HTML/JS/TS parsing
+# Using the latest stable swc_core which has fixed serde compatibility
+swc_core = { version = "47", features = ["ecma_ast", "ecma_parser", "common"] }
+
+# YAML parsing
+serde_yaml = "0.9"
+
+# JSON serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# File system operations
+walkdir = "2.4"
+glob = "0.3"
+ignore = "0.4"
+
+# Regex
+regex = "1.10"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# String similarity
+strsim = "0.11"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true

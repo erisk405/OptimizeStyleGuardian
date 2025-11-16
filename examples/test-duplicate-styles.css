@@ -1,0 +1,55 @@
+/* Example CSS file to test duplicate style detection */
+
+/* These two classes are identical - should be flagged */
+.button-primary {
+    background-color: #0066cc;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 4px;
+    font-weight: bold;
+}
+
+.cta-button {
+    background-color: #0066cc;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 4px;
+    font-weight: bold;
+}
+
+/* These classes are similar (90%+ match) */
+.card-header {
+    font-size: 20px;
+    font-weight: 600;
+    color: #212529;
+    margin-bottom: 16px;
+}
+
+.section-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: #212529;
+    margin-bottom: 20px; /* Only difference */
+}
+
+/* Expensive selector - should be flagged for performance */
+* div .container > .item {
+    margin: 10px;
+}
+
+/* Deep nesting - should be flagged */
+.nav .menu .item .link .text {
+    color: blue;
+}
+
+/* Hardcoded colors that should use design tokens */
+.custom-alert {
+    background-color: #28a745; /* Should use var(--color-success) */
+    color: white;
+    padding: 16px; /* Should use var(--spacing-md) */
+}
+
+.warning-box {
+    background-color: #ffc107; /* Should use var(--color-warning) */
+    padding: 8px; /* Should use var(--spacing-sm) */
+}

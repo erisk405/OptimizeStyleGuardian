@@ -1,0 +1,136 @@
+# Go5 Style Guardian - Design System Configuration
+# This file defines your design system components, tokens, and replacement rules
+
+components:
+  # Button component
+  go5-button:
+    selector: go5-button
+    keywords:
+      - button
+      - btn
+      - cta
+      - action
+    replaces:
+      - "button[type='button']"
+      - "button[type='submit']"
+
+  # Input component
+  go5-input:
+    selector: go5-input
+    keywords:
+      - input
+      - textbox
+      - field
+      - form-control
+    replaces:
+      - "input[type='text']"
+      - "input[type='email']"
+      - "input[type='password']"
+
+  # Card component
+  go5-card:
+    selector: go5-card
+    keywords:
+      - card
+      - panel
+      - box
+    replaces:
+      - "div[class*='card']"
+
+  # Modal/Dialog component
+  go5-modal:
+    selector: go5-modal
+    keywords:
+      - modal
+      - dialog
+      - popup
+      - overlay
+    replaces:
+      - "div[class*='modal']"
+
+  # Icon component
+  go5-icon:
+    selector: go5-icon
+    keywords:
+      - icon
+      - svg
+    replaces:
+      - "mat-icon"
+      - "i[class*='icon']"
+
+  # Alert component
+  go5-alert:
+    selector: go5-alert
+    keywords:
+      - alert
+      - notification
+      - toast
+      - message
+    replaces:
+      - "div[class*='alert']"
+
+tokens:
+  # Color tokens
+  colors:
+    primary: "#0066cc"
+    secondary: "#6c757d"
+    success: "#28a745"
+    danger: "#dc3545"
+    warning: "#ffc107"
+    info: "#17a2b8"
+    light: "#f8f9fa"
+    dark: "#343a40"
+
+    # Text colors
+    text-primary: "#212529"
+    text-secondary: "#6c757d"
+    text-muted: "#868e96"
+
+    # Background colors
+    bg-primary: "#ffffff"
+    bg-secondary: "#f8f9fa"
+    bg-dark: "#343a40"
+
+    # Border colors
+    border-light: "#dee2e6"
+    border-medium: "#ced4da"
+    border-dark: "#adb5bd"
+
+  # Spacing tokens (following 8px base grid)
+  spacing:
+    xs: "4px"
+    sm: "8px"
+    md: "16px"
+    lg: "24px"
+    xl: "32px"
+    xxl: "48px"
+    xxxl: "64px"
+
+  # Typography tokens
+  typography:
+    # Font families
+    font-primary: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
+    font-secondary: "'Arial', sans-serif"
+    font-mono: "'Courier New', Courier, monospace"
+
+    # Font sizes
+    text-xs: "12px"
+    text-sm: "14px"
+    text-base: "16px"
+    text-lg: "18px"
+    text-xl: "20px"
+    text-2xl: "24px"
+    text-3xl: "30px"
+    text-4xl: "36px"
+
+    # Font weights
+    weight-light: "300"
+    weight-normal: "400"
+    weight-medium: "500"
+    weight-semibold: "600"
+    weight-bold: "700"
+
+    # Line heights
+    leading-tight: "1.25"
+    leading-normal: "1.5"
+    leading-relaxed: "1.75"
