@@ -1,0 +1,7 @@
+{
+    "recommendations": [
+        "rust-lang.rust-analyzer",
+        "ms-vscode.vscode-typescript-next",
+        "ms-vscode.extension-test-runner"
+    ]
+}

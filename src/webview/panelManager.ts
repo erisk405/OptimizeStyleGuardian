@@ -1,114 +1,131 @@
-import * as vscode from 'vscode';
-import * as path from 'path';
-import { AnalysisResult } from '../types';
+import * as vscode from "vscode";
+import * as path from "path";
+import { AnalysisResult } from "../types";
 
 export class PanelManager {
-    private panel: vscode.WebviewPanel | undefined;
-    private currentResults: AnalysisResult | undefined;
+  private panel: vscode.WebviewPanel | undefined;
+  private currentResults: AnalysisResult | undefined;
 
-    constructor(private context: vscode.ExtensionContext) {}
+  constructor(private context: vscode.ExtensionContext) {}
 
-    public showPanel() {
-        if (this.panel) {
-            this.panel.reveal(vscode.ViewColumn.Two);
-        } else {
-            this.createPanel();
-        }
+  public showPanel() {
+    if (this.panel) {
+      this.panel.reveal(vscode.ViewColumn.Two);
+    } else {
+      this.createPanel();
     }
+  }
 
-    public updateResults(results: AnalysisResult) {
-        this.currentResults = results;
-        if (this.panel) {
-            this.panel.webview.postMessage({
-                type: 'updateResults',
-                data: results
-            });
-        }
+  public updateResults(results: AnalysisResult) {
+    this.currentResults = results;
+    if (this.panel) {
+      this.panel.webview.postMessage({
+        type: "updateResults",
+        data: results,
+      });
     }
+  }
 
-    private createPanel() {
-        this.panel = vscode.window.createWebviewPanel(
-            'go5StyleGuardian',
-            'Go5 Style Guardian',
-            vscode.ViewColumn.Two,
-            {
-                enableScripts: true,
-                retainContextWhenHidden: true,
-                localResourceRoots: [
-                    vscode.Uri.file(path.join(this.context.extensionPath, 'media'))
-                ]
+  private createPanel() {
+    this.panel = vscode.window.createWebviewPanel(
+      "go5StyleGuardian",
+      "Go5 Style Guardian",
+      vscode.ViewColumn.Two,
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        localResourceRoots: [
+          vscode.Uri.file(path.join(this.context.extensionPath, "media")),
+        ],
+      },
+    );
+
+    this.panel.webview.html = this.getWebviewContent();
+
+    // Handle messages from webview
+    this.panel.webview.onDidReceiveMessage(
+      (message) => {
+        switch (message.type) {
+          case "goToCode":
+            this.goToCode(message.file, message.line, message.column);
+            break;
+          case "applyFix":
+            this.applyFix(message.issueId, message.fixType);
+            break;
+          case "ready":
+            // Webview is ready, send current results if available
+            if (this.currentResults) {
+              this.panel?.webview.postMessage({
+                type: "updateResults",
+                data: this.currentResults,
+              });
             }
-        );
-
-        this.panel.webview.html = this.getWebviewContent();
-
-        // Handle messages from webview
-        this.panel.webview.onDidReceiveMessage(
-            message => {
-                switch (message.type) {
-                    case 'goToCode':
-                        this.goToCode(message.file, message.line, message.column);
-                        break;
-                    case 'applyFix':
-                        this.applyFix(message.issueId, message.fixType);
-                        break;
-                    case 'ready':
-                        // Webview is ready, send current results if available
-                        if (this.currentResults) {
-                            this.panel?.webview.postMessage({
-                                type: 'updateResults',
-                                data: this.currentResults
-                            });
-                        }
-                        break;
-                }
-            },
-            undefined,
-            this.context.subscriptions
-        );
-
-        this.panel.onDidDispose(
-            () => {
-                this.panel = undefined;
-            },
-            null,
-            this.context.subscriptions
-        );
-
-        // Send initial results if available
-        if (this.currentResults) {
-            setTimeout(() => {
-                this.panel?.webview.postMessage({
-                    type: 'updateResults',
-                    data: this.currentResults
-                });
-            }, 100);
+            break;
         }
+      },
+      undefined,
+      this.context.subscriptions,
+    );
+
+    this.panel.onDidDispose(
+      () => {
+        this.panel = undefined;
+      },
+      null,
+      this.context.subscriptions,
+    );
+
+    // Send initial results if available
+    if (this.currentResults) {
+      setTimeout(() => {
+        this.panel?.webview.postMessage({
+          type: "updateResults",
+          data: this.currentResults,
+        });
+      }, 100);
     }
+  }
 
-    private async goToCode(file: string, line: number, column?: number) {
-        try {
-            const document = await vscode.workspace.openTextDocument(file);
-            const editor = await vscode.window.showTextDocument(document, vscode.ViewColumn.One);
+  private async goToCode(file: string, line: number, column?: number) {
+    try {
+      console.log("goToCode received:", { file, line, column });
 
-            const position = new vscode.Position(Math.max(0, line - 1), column ? Math.max(0, column - 1) : 0);
-            editor.selection = new vscode.Selection(position, position);
-            editor.revealRange(
-                new vscode.Range(position, position),
-                vscode.TextEditorRevealType.InCenter
-            );
-        } catch (error) {
-            vscode.window.showErrorMessage(`Could not open file: ${file}`);
-        }
+      // Normalize the file path (remove double backslashes)
+      const normalizedPath = file.replace(/\\\\/g, "\\");
+      console.log("Normalized path:", normalizedPath);
+
+      const document = await vscode.workspace.openTextDocument(normalizedPath);
+      const editor = await vscode.window.showTextDocument(
+        document,
+        vscode.ViewColumn.One,
+      );
+
+      const position = new vscode.Position(
+        Math.max(0, line - 1),
+        column ? Math.max(0, column - 1) : 0,
+      );
+      editor.selection = new vscode.Selection(position, position);
+      editor.revealRange(
+        new vscode.Range(position, position),
+        vscode.TextEditorRevealType.InCenter,
+      );
+
+      console.log("Successfully navigated to:", normalizedPath, "line:", line);
+    } catch (error) {
+      console.error("Error opening file:", error);
+      vscode.window.showErrorMessage(
+        `Could not open file: ${file}\nError: ${error}`,
+      );
     }
+  }
 
-    private async applyFix(issueId: string, fixType: string) {
-        // TODO: Implement auto-fix functionality
-        vscode.window.showInformationMessage('Auto-fix feature coming soon!');
-    }
+  private async applyFix(issueId: string, fixType: string) {
+    // TODO: Implement auto-fix functionality
+    vscode.window.showInformationMessage("Auto-fix feature coming soon!");
+  }
 
-    private getWebviewContent(): string {
-        return `<!DOCTYPE html>
+  private getWebviewContent(): string {
+    return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -512,43 +529,60 @@ export class PanelManager {
         }
 
         function createIssueCard(issue) {
-            return \`
-                <div class="issue-card \${issue.severity}">
-                    <div class="issue-header">
-                        <div class="issue-title">\${issue.title}</div>
-                        <span class="severity-badge \${issue.severity}">\${issue.severity}</span>
-                    </div>
-                    <div class="issue-details">\${issue.details}</div>
-                    <div class="issue-location">\${issue.file}:\${issue.line || '?'}\${issue.column ? ':' + issue.column : ''}</div>
-                    <div class="issue-actions">
-                        <button class="btn btn-primary" onclick="goToCode('\${issue.file}', \${issue.line || 0}, \${issue.column || 0})">
-                            🔍 Go to Code
-                        </button>
-                        \${issue.suggestion ? \`<button class="btn btn-secondary" onclick="applySuggestion()">🔧 Apply Fix</button>\` : ''}
-                    </div>
-                </div>
-            \`;
+            const displayFile = issue.file.replace(/\\\\/g, '\\\\');
+            const fileAttr = issue.file.replace(/"/g, '&quot;').replace(/\\\\/g, '\\\\');
+            const fixButton = issue.suggestion ? '<button class="btn btn-secondary" data-action="fix">🔧 Apply Fix</button>' : '';
+
+            return '<div class="issue-card ' + issue.severity + '">' +
+                '<div class="issue-header">' +
+                '<div class="issue-title">' + issue.title + '</div>' +
+                '<span class="severity-badge ' + issue.severity + '">' + issue.severity + '</span>' +
+                '</div>' +
+                '<div class="issue-details">' + issue.details + '</div>' +
+                '<div class="issue-location">' + displayFile + ':' + (issue.line || '?') + (issue.column ? ':' + issue.column : '') + '</div>' +
+                '<div class="issue-actions">' +
+                '<button class="btn btn-primary" data-action="goto" data-file="' + fileAttr + '" data-line="' + (issue.line || 0) + '" data-column="' + (issue.column || 0) + '">' +
+                '🔍 Go to Code' +
+                '</button>' +
+                fixButton +
+                '</div>' +
+                '</div>';
         }
 
-        function goToCode(file, line, column) {
-            vscode.postMessage({
-                type: 'goToCode',
-                file: file,
-                line: line,
-                column: column
+        function attachEventListeners() {
+            document.addEventListener('click', function(e) {
+                const target = e.target;
+                if (target.tagName === 'BUTTON' && target.dataset.action === 'goto') {
+                    const file = target.dataset.file;
+                    const line = parseInt(target.dataset.line) || 0;
+                    const column = parseInt(target.dataset.column) || 0;
+
+                    console.log('Go to Code clicked:', { file, line, column });
+
+                    vscode.postMessage({
+                        type: 'goToCode',
+                        file: file,
+                        line: line,
+                        column: column
+                    });
+                }
+
+                if (target.tagName === 'BUTTON' && target.dataset.action === 'fix') {
+                    console.log('Apply Fix clicked');
+                    vscode.postMessage({
+                        type: 'applyFix'
+                    });
+                }
             });
         }
 
-        function applySuggestion() {
-            vscode.postMessage({
-                type: 'applyFix'
-            });
-        }
+        // Initialize event listeners on load
+        attachEventListeners();
 
         // Notify extension that webview is ready
         vscode.postMessage({ type: 'ready' });
     </script>
 </body>
 </html>`;
-    }
+  }
 }

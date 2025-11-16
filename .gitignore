@@ -11,7 +11,7 @@ engine/target/
 engine/Cargo.lock
 
 # IDE
-.vscode/
+.vscode/settings.json
 .idea/
 *.swp
 *.swo
