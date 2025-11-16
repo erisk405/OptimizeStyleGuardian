@@ -493,14 +493,24 @@ export class PanelManager {
             ).join('') + '</div>';
         }
 
+        function escapeHtml(text) {
+            if (!text) return '';
+            return String(text)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
         function getStyleIssueTitle(issue) {
             switch (issue.type) {
                 case 'identical_classes':
-                    return \`Identical class: <code>\${issue.class}</code> = <code>\${issue.duplicateOf}</code>\`;
+                    return 'Identical class: <code>' + escapeHtml(issue.class) + '</code> = <code>' + escapeHtml(issue.duplicateOf) + '</code>';
                 case 'similar_classes':
-                    return \`Similar classes: <code>\${issue.class}</code> ~ <code>\${issue.duplicateOf}</code> (\${issue.similarity}% match)\`;
+                    return 'Similar classes: <code>' + escapeHtml(issue.class) + '</code> ~ <code>' + escapeHtml(issue.duplicateOf) + '</code> (' + issue.similarity + '% match)';
                 case 'inline_style_duplicate':
-                    return \`Inline style matches existing class <code>\${issue.duplicateOf}</code>\`;
+                    return 'Inline style matches existing class <code>' + escapeHtml(issue.duplicateOf) + '</code>';
                 default:
                     return 'Unknown issue';
             }
@@ -508,7 +518,7 @@ export class PanelManager {
 
         function getStyleIssueDetails(issue) {
             if (issue.properties && issue.properties.length > 0) {
-                return \`Matching properties: \${issue.properties.join(', ')}\`;
+                return 'Matching properties: ' + issue.properties.join(', ');
             }
             return 'Consider using the existing class to reduce duplication.';
         }
@@ -516,13 +526,13 @@ export class PanelManager {
         function getDesignSystemIssueTitle(issue) {
             switch (issue.type) {
                 case 'component_replacement':
-                    return \`Replace <code>\${issue.current}</code> with <code>\${issue.suggested}</code>\`;
+                    return 'Replace <code>' + escapeHtml(issue.current) + '</code> with <code>' + escapeHtml(issue.suggested) + '</code>';
                 case 'class_replacement':
-                    return \`Use design system class <code>\${issue.suggested}</code>\`;
+                    return 'Use design system class <code>' + escapeHtml(issue.suggested) + '</code>';
                 case 'color_token':
-                    return \`Use color token instead of <code>\${issue.current}</code>\`;
+                    return 'Use color token instead of <code>' + escapeHtml(issue.current) + '</code>';
                 case 'spacing_token':
-                    return \`Use spacing token instead of <code>\${issue.current}</code>\`;
+                    return 'Use spacing token instead of <code>' + escapeHtml(issue.current) + '</code>';
                 default:
                     return 'Design system recommendation';
             }
