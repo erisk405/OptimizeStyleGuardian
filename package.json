@@ -35,6 +35,10 @@
       {
         "command": "go5StyleGuardian.openPanel",
         "title": "Go5: Open Style Guardian Panel"
+      },
+      {
+        "command": "go5StyleGuardian.configureApiKey",
+        "title": "Go5: Configure Anthropic API Key"
       }
     ],
     "menus": {
@@ -113,6 +117,35 @@
             "**/.git/**"
           ],
           "description": "File patterns to exclude from scanning"
+        },
+        "go5StyleGuardian.enableAiSuggestions": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable AI-powered code suggestions using Anthropic Claude API"
+        },
+        "go5StyleGuardian.aiModel": {
+          "type": "string",
+          "default": "claude-sonnet-4-5-20250929",
+          "enum": [
+            "claude-sonnet-4-5-20250929",
+            "claude-haiku-4-5-20251001",
+            "claude-opus-4-1-20250805"
+          ],
+          "description": "Anthropic AI model to use for suggestions"
+        },
+        "go5StyleGuardian.aiMaxIssuesPerScan": {
+          "type": "number",
+          "default": 10,
+          "minimum": 1,
+          "maximum": 50,
+          "description": "Maximum number of issues to enhance with AI per scan (to control API costs)"
+        },
+        "go5StyleGuardian.aiContextLines": {
+          "type": "number",
+          "default": 5,
+          "minimum": 2,
+          "maximum": 20,
+          "description": "Number of lines of code context to send to AI around the issue"
         }
       }
     }
@@ -134,5 +167,7 @@
     "eslint": "^8.54.0",
     "typescript": "^5.3.3"
   },
-  "dependencies": {}
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1"
+  }
 }

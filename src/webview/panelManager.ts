@@ -52,6 +52,14 @@ export class PanelManager {
           case "applyFix":
             this.applyFix(message.issueId, message.fixType);
             break;
+          case "applyAiFix":
+            this.applyAiFix(
+              message.file,
+              message.startLine,
+              message.endLine,
+              message.suggestedCode,
+            );
+            break;
           case "ready":
             // Webview is ready, send current results if available
             if (this.currentResults) {
@@ -122,6 +130,66 @@ export class PanelManager {
   private async applyFix(issueId: string, fixType: string) {
     // TODO: Implement auto-fix functionality
     vscode.window.showInformationMessage("Auto-fix feature coming soon!");
+  }
+
+  private async applyAiFix(
+    file: string,
+    startLine: number,
+    endLine: number,
+    suggestedCode: string,
+  ) {
+    try {
+      console.log("Applying AI fix:", { file, startLine, endLine });
+
+      // Normalize the file path
+      const normalizedPath = file.replace(/\\\\/g, "\\");
+
+      // Open the document
+      const document = await vscode.workspace.openTextDocument(normalizedPath);
+      const editor = await vscode.window.showTextDocument(
+        document,
+        vscode.ViewColumn.One,
+      );
+
+      // Create edit
+      const edit = new vscode.WorkspaceEdit();
+
+      // Calculate range (lines are 0-indexed in VSCode API)
+      const startPos = new vscode.Position(Math.max(0, startLine - 1), 0);
+      const endPos = new vscode.Position(
+        Math.max(0, endLine - 1),
+        document.lineAt(Math.max(0, endLine - 1)).text.length,
+      );
+      const range = new vscode.Range(startPos, endPos);
+
+      // Replace the range with suggested code
+      edit.replace(document.uri, range, suggestedCode);
+
+      // Apply the edit
+      const success = await vscode.workspace.applyEdit(edit);
+
+      if (success) {
+        // Show success message
+        vscode.window.showInformationMessage(
+          "✓ AI suggestion applied successfully!",
+        );
+
+        // Move cursor to the changed location
+        const newPosition = new vscode.Position(Math.max(0, startLine - 1), 0);
+        editor.selection = new vscode.Selection(newPosition, newPosition);
+        editor.revealRange(
+          new vscode.Range(newPosition, newPosition),
+          vscode.TextEditorRevealType.InCenter,
+        );
+      } else {
+        vscode.window.showErrorMessage("Failed to apply AI suggestion");
+      }
+    } catch (error) {
+      console.error("Error applying AI fix:", error);
+      vscode.window.showErrorMessage(
+        `Failed to apply AI fix: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   private getWebviewContent(): string {
@@ -345,6 +413,103 @@ export class PanelManager {
             font-family: var(--vscode-editor-font-family);
             font-size: 12px;
         }
+
+        /* AI Suggestion Styles */
+        .ai-suggestion {
+            margin-top: 15px;
+            padding: 15px;
+            background: var(--vscode-textBlockQuote-background);
+            border-left: 3px solid #9b59b6;
+            border-radius: 5px;
+        }
+
+        .ai-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 11px;
+            font-weight: bold;
+            color: #9b59b6;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .ai-explanation {
+            font-size: 13px;
+            margin-bottom: 15px;
+            line-height: 1.5;
+        }
+
+        .code-diff {
+            margin: 15px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .code-block {
+            background: var(--vscode-editor-background);
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 3px;
+            padding: 10px;
+        }
+
+        .code-block .label {
+            display: block;
+            font-size: 11px;
+            font-weight: bold;
+            margin-bottom: 5px;
+            opacity: 0.7;
+        }
+
+        .code-block.before .label {
+            color: var(--vscode-errorForeground);
+        }
+
+        .code-block.after .label {
+            color: var(--vscode-testing-iconPassed);
+        }
+
+        .code-block pre {
+            margin: 0;
+            padding: 0;
+            font-family: var(--vscode-editor-font-family);
+            font-size: 12px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .ai-reasoning {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-top: 10px;
+            font-style: italic;
+        }
+
+        .confidence-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: bold;
+            margin-left: 5px;
+        }
+
+        .confidence-badge.high {
+            background: var(--vscode-testing-iconPassed);
+            color: var(--vscode-editor-background);
+        }
+
+        .confidence-badge.medium {
+            background: var(--vscode-list-warningForeground);
+            color: var(--vscode-editor-background);
+        }
+
+        .confidence-badge.low {
+            background: var(--vscode-errorForeground);
+            color: var(--vscode-editor-background);
+        }
     </style>
 </head>
 <body>
@@ -449,7 +614,8 @@ export class PanelManager {
                     details: getStyleIssueDetails(issue),
                     file: issue.file,
                     line: issue.line,
-                    column: issue.column
+                    column: issue.column,
+                    aiSuggestion: issue.aiSuggestion
                 })
             ).join('') + '</div>';
         }
@@ -469,7 +635,8 @@ export class PanelManager {
                     file: issue.file,
                     line: issue.line,
                     column: issue.column,
-                    suggestion: issue.suggested
+                    suggestion: issue.suggested,
+                    aiSuggestion: issue.aiSuggestion
                 })
             ).join('') + '</div>';
         }
@@ -488,7 +655,8 @@ export class PanelManager {
                     details: issue.recommendation,
                     file: issue.file,
                     line: issue.line,
-                    column: issue.column
+                    column: issue.column,
+                    aiSuggestion: issue.aiSuggestion
                 })
             ).join('') + '</div>';
         }
@@ -543,6 +711,35 @@ export class PanelManager {
             const fileAttr = issue.file.replace(/"/g, '&quot;').replace(/\\\\/g, '\\\\');
             const fixButton = issue.suggestion ? '<button class="btn btn-secondary" data-action="fix">🔧 Apply Fix</button>' : '';
 
+            // AI Suggestion section
+            let aiSuggestionHtml = '';
+            if (issue.aiSuggestion) {
+                const ai = issue.aiSuggestion;
+                const confidenceBadge = '<span class="confidence-badge ' + ai.confidence + '">' + ai.confidence.toUpperCase() + '</span>';
+
+                aiSuggestionHtml = '<div class="ai-suggestion">' +
+                    '<div class="ai-badge">✨ AI Suggestion' + confidenceBadge + '</div>' +
+                    '<div class="ai-explanation">' + escapeHtml(ai.explanation) + '</div>' +
+                    '<div class="code-diff">' +
+                    '<div class="code-block before">' +
+                    '<span class="label">❌ Current Code:</span>' +
+                    '<pre>' + escapeHtml(ai.codeChange.original) + '</pre>' +
+                    '</div>' +
+                    '<div class="code-block after">' +
+                    '<span class="label">✅ Suggested Code:</span>' +
+                    '<pre>' + escapeHtml(ai.codeChange.suggested) + '</pre>' +
+                    '</div>' +
+                    '</div>' +
+                    '<div class="ai-reasoning">💡 ' + escapeHtml(ai.reasoning) + '</div>' +
+                    '<button class="btn btn-primary" data-action="apply-ai" data-file="' + fileAttr + '" ' +
+                    'data-start-line="' + ai.codeChange.startLine + '" ' +
+                    'data-end-line="' + ai.codeChange.endLine + '" ' +
+                    'data-suggested-code="' + escapeHtml(ai.codeChange.suggested).replace(/"/g, '&quot;') + '">' +
+                    '⚡ Apply AI Fix' +
+                    '</button>' +
+                    '</div>';
+            }
+
             return '<div class="issue-card ' + issue.severity + '">' +
                 '<div class="issue-header">' +
                 '<div class="issue-title">' + issue.title + '</div>' +
@@ -556,6 +753,7 @@ export class PanelManager {
                 '</button>' +
                 fixButton +
                 '</div>' +
+                aiSuggestionHtml +
                 '</div>';
         }
 
@@ -581,6 +779,23 @@ export class PanelManager {
                     console.log('Apply Fix clicked');
                     vscode.postMessage({
                         type: 'applyFix'
+                    });
+                }
+
+                if (target.tagName === 'BUTTON' && target.dataset.action === 'apply-ai') {
+                    const file = target.dataset.file;
+                    const startLine = parseInt(target.dataset.startLine) || 0;
+                    const endLine = parseInt(target.dataset.endLine) || 0;
+                    const suggestedCode = target.dataset.suggestedCode;
+
+                    console.log('Apply AI Fix clicked:', { file, startLine, endLine });
+
+                    vscode.postMessage({
+                        type: 'applyAiFix',
+                        file: file,
+                        startLine: startLine,
+                        endLine: endLine,
+                        suggestedCode: suggestedCode
                     });
                 }
             });
