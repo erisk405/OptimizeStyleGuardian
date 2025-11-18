@@ -137,6 +137,7 @@ export class IssueEnhancer {
       duplicates: enhancedDuplicates,
       designSystem: enhancedDesignSystem,
       performance: enhancedPerformance,
+      imports: result.imports || [], // Pass through imports data
     };
   }
 
@@ -355,6 +356,29 @@ Expected line numbers: start_line=${issue.line || 1}, end_line=${issue.line || 1
       ? `${issue.sizeKb} KB`
       : "Unknown (external package)";
 
+    // Format usage context
+    let usageContextText = "";
+    if (issue.usageContext) {
+      usageContextText = "\n\n=== COMPONENT USAGE IN THIS FILE ===\n";
+      for (const [itemName, usages] of Object.entries(issue.usageContext)) {
+        if (usages.length > 0) {
+          usageContextText += `\n${itemName} is used ${usages.length} time(s):\n`;
+          usages.forEach((usage, idx) => {
+            usageContextText += `  ${idx + 1}. Line ${usage.line}: ${usage.code_snippet}\n`;
+            if (usage.attributes) {
+              const attrsStr = Object.entries(usage.attributes)
+                .map(([k, v]) => `${k}="${v}"`)
+                .join(" ");
+              usageContextText += `     Attributes: ${attrsStr}\n`;
+            }
+          });
+        } else {
+          usageContextText += `\n${itemName}: NOT USED (can be safely removed)\n`;
+        }
+      }
+      usageContextText += "\n";
+    }
+
     return `Analyze this import statement and suggest optimizations to reduce bundle size:
 
 File: ${issue.file}
@@ -368,6 +392,12 @@ Code Context:
 \`\`\`typescript
 ${context}
 \`\`\`
+${usageContextText}
+IMPORTANT: Based on the usage information above:
+- If a component/function is NOT USED, suggest removing it from the import statement
+- If a component/function IS USED, suggest optimization while preserving its functionality
+- Consider the specific attributes/props used when suggesting alternatives
+- DO NOT suggest removing items that are actually used in the file
 
 Task: Provide specific suggestions to reduce the bundle size impact of this import. Consider:
 1. Tree-shaking: Can we import only specific functions/components instead of the whole package?

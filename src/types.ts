@@ -65,6 +65,13 @@ export interface PerformanceIssue {
   recommendation: string;
 }
 
+export interface ComponentUsage {
+  line: number;
+  usage_type: "html_tag" | "jsx_component" | "function_call";
+  code_snippet: string;
+  attributes?: { [key: string]: string };
+}
+
 export interface ImportAnalysisIssue {
   file: string;
   line: number;
@@ -74,6 +81,7 @@ export interface ImportAnalysisIssue {
   resolvedPath?: string;
   severity: "error" | "warning" | "info";
   message: string;
+  usageContext?: { [key: string]: ComponentUsage[] };
   aiSuggestion?: ImportOptimizationSuggestion;
 }
 

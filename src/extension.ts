@@ -15,7 +15,7 @@ export function activate(context: vscode.ExtensionContext) {
   console.log("Go5 Style Guardian is now active!");
 
   const apiKeyManager = new ApiKeyManager(context);
-  const panelManager = new PanelManager(context);
+  const panelManager = new PanelManager(context, apiKeyManager);
   const rustBridge = new RustBridge(context);
   const scanCommand = new ScanCommand(context, panelManager, apiKeyManager);
   const hookManager = new GitHookManager(context);

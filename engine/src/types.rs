@@ -1,3 +1,4 @@
+use crate::analyzers::usage_extractor::ComponentUsage;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -24,6 +25,8 @@ pub struct ImportAnalysisIssue {
     pub resolved_path: Option<String>,
     pub severity: String,
     pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none", rename = "usageContext")]
+    pub usage_context: Option<HashMap<String, Vec<ComponentUsage>>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -3,13 +3,17 @@ import * as path from "path";
 import { AnalysisResult, ImportAnalysisIssue } from "../types";
 import { IssueEnhancer } from "../services/issueEnhancer";
 import { AnthropicService } from "../services/anthropicService";
+import { ApiKeyManager } from "../config/apiKeyManager";
 
 export class PanelManager {
   private panel: vscode.WebviewPanel | undefined;
   private currentResults: AnalysisResult | undefined;
   private issueEnhancer: IssueEnhancer | undefined;
 
-  constructor(private context: vscode.ExtensionContext) {}
+  constructor(
+    private context: vscode.ExtensionContext,
+    private apiKeyManager: ApiKeyManager,
+  ) {}
 
   public showPanel() {
     if (this.panel) {
@@ -21,11 +25,21 @@ export class PanelManager {
 
   public updateResults(results: AnalysisResult) {
     this.currentResults = results;
+    console.log("[PanelManager] Updating results:", {
+      duplicates: results.duplicates?.length || 0,
+      designSystem: results.designSystem?.length || 0,
+      performance: results.performance?.length || 0,
+      imports: results.imports?.length || 0,
+    });
+
     if (this.panel) {
+      console.log("[PanelManager] Sending results to webview");
       this.panel.webview.postMessage({
         type: "updateResults",
         data: results,
       });
+    } else {
+      console.log("[PanelManager] No panel to update");
     }
   }
 
@@ -223,16 +237,16 @@ export class PanelManager {
 
       // Initialize IssueEnhancer if needed
       if (!this.issueEnhancer) {
-        const config = vscode.workspace.getConfiguration("go5StyleGuardian");
-        const apiKey = config.get<string>("anthropicApiKey");
+        const apiKey = await this.apiKeyManager.getApiKey();
 
         if (!apiKey) {
           vscode.window.showErrorMessage(
-            "Please set your Anthropic API key in settings (go5StyleGuardian.anthropicApiKey)",
+            "Please set your Anthropic API key first. Use: Go5 Style Guardian: Configure API Key",
           );
           return;
         }
 
+        const config = vscode.workspace.getConfiguration("go5StyleGuardian");
         const aiModel = config.get<string>(
           "aiModel",
           "claude-sonnet-4-5-20250929",
@@ -394,27 +408,29 @@ export class PanelManager {
 
         .issue-card {
             background: #141414;
-            padding: 16px;
-            border-radius: 8px;
-            border-left: 2px solid #2a2a2a;
+            padding: 20px;
+            border-radius: 12px;
             border: 1px solid #2a2a2a;
-            transition: border-color 0.2s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .issue-card:hover {
             border-color: #3a3a3a;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16);
+            transform: translateY(-1px);
         }
 
         .issue-card.critical {
-            border-left-color: #ef4444;
+            border-left: 3px solid #ef4444;
         }
 
         .issue-card.warning {
-            border-left-color: #f59e0b;
+            border-left: 3px solid #f59e0b;
         }
 
         .issue-card.info {
-            border-left-color: #6366f1;
+            border-left: 3px solid #6366f1;
         }
 
         .issue-header {
@@ -531,26 +547,38 @@ export class PanelManager {
         /* AI Suggestion Styles */
         .ai-suggestion-panel {
             margin-top: 16px;
-            padding: 16px;
-            background: rgba(99, 102, 241, 0.05);
+            padding: 20px;
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.03) 0%, rgba(139, 92, 246, 0.03) 100%);
             border: 1px solid rgba(99, 102, 241, 0.2);
-            border-radius: 6px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.08);
         }
 
         .ai-suggestion-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 12px;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(99, 102, 241, 0.1);
         }
 
         .ai-badge {
-            background: rgba(99, 102, 241, 0.15);
-            color: #6366f1;
-            padding: 4px 10px;
-            border-radius: 4px;
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: #ffffff;
+            padding: 6px 12px;
+            border-radius: 6px;
             font-size: 12px;
             font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 2px 4px rgba(99, 102, 241, 0.2);
+        }
+
+        .ai-badge::before {
+            content: "⚡";
+            font-size: 14px;
         }
 
         .confidence-badge {
@@ -585,8 +613,8 @@ export class PanelManager {
         .code-diff {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin: 16px 0;
+            gap: 8px;
+            margin: 12px 0;
         }
 
         .code-section {
@@ -595,35 +623,47 @@ export class PanelManager {
         }
 
         .code-label {
-            font-size: 11px;
-            font-weight: 600;
+            font-size: 10px;
+            font-weight: 500;
             color: #888888;
-            margin-bottom: 6px;
+            margin-bottom: 4px;
             text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .code-block {
-            background: #1a1a1a;
-            border: 1px solid #2a2a2a;
-            border-radius: 4px;
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
             padding: 12px;
             margin: 0;
             overflow-x: auto;
             font-size: 12px;
-            line-height: 1.5;
+            line-height: 1.6;
         }
 
         .code-block code {
-            font-family: 'Courier New', monospace;
+            font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Menlo', 'Consolas', monospace;
             color: #e1e1e1;
         }
 
+        /* Syntax highlighting - GitHub Dark theme */
+        .code-block .keyword { color: #ff7b72; }
+        .code-block .string { color: #a5d6ff; }
+        .code-block .function { color: #d2a8ff; }
+        .code-block .variable { color: #ffa657; }
+        .code-block .comment { color: #8b949e; }
+        .code-block .operator { color: #ff7b72; }
+        .code-block .punctuation { color: #c9d1d9; }
+
         .code-original {
-            border-left: 3px solid rgba(239, 68, 68, 0.5);
+            border-left: 3px solid #da3633;
+            background: rgba(218, 54, 51, 0.05);
         }
 
         .code-suggested {
-            border-left: 3px solid rgba(34, 197, 94, 0.5);
+            border-left: 3px solid #3fb950;
+            background: rgba(63, 185, 80, 0.05);
         }
 
         .ai-reasoning {
@@ -663,27 +703,193 @@ export class PanelManager {
             text-align: center;
         }
 
+        /* Usage Context Styles */
+        .usage-context {
+            margin: 12px 0;
+            padding: 12px;
+            background: rgba(99, 102, 241, 0.05);
+            border-radius: 8px;
+            border: 1px solid rgba(99, 102, 241, 0.1);
+        }
+
+        .usage-header {
+            font-size: 11px;
+            font-weight: 600;
+            color: #8b949e;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .usage-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            padding: 8px;
+            background: #141414;
+            border-radius: 6px;
+        }
+
+        .usage-item.unused {
+            border-left: 3px solid #f59e0b;
+        }
+
+        .usage-name {
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 12px;
+            color: #e1e1e1;
+            font-weight: 600;
+        }
+
+        .usage-badge {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+
+        .usage-badge.used {
+            background: rgba(34, 197, 94, 0.15);
+            color: #22c55e;
+        }
+
+        .usage-badge.unused {
+            background: rgba(245, 158, 11, 0.15);
+            color: #f59e0b;
+        }
+
+        .usage-examples {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-top: 8px;
+            width: 100%;
+        }
+
+        .usage-code {
+            font-size: 11px;
+            padding: 4px 8px;
+            background: #0d1117;
+            border-left: 2px solid #6366f1;
+            border-radius: 3px;
+            font-family: 'SF Mono', Monaco, monospace;
+        }
+
+        .usage-more {
+            font-size: 10px;
+            color: #8b949e;
+            font-style: italic;
+        }
+
+        /* Comparison Table Styles */
+        .comparison-table {
+            margin: 16px 0;
+            border: 1px solid #2a2a2a;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .comparison-header,
+        .comparison-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
+            gap: 12px;
+            padding: 12px;
+        }
+
+        .comparison-header {
+            background: #1a1a1a;
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+            color: #8b949e;
+            letter-spacing: 0.5px;
+        }
+
+        .comparison-row {
+            border-top: 1px solid #2a2a2a;
+        }
+
+        .comparison-row.highlight {
+            background: rgba(34, 197, 94, 0.05);
+        }
+
+        .col-after.savings {
+            color: #22c55e;
+            font-weight: 600;
+        }
+
+        /* Action Links Styles */
+        .action-links {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #2a2a2a;
+            flex-wrap: wrap;
+        }
+
+        .action-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 6px;
+            color: #6366f1;
+            text-decoration: none;
+            font-size: 12px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .action-link:hover {
+            background: #2a2a2a;
+            border-color: #6366f1;
+            transform: translateY(-1px);
+        }
+
         .btn-ai {
             background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
             color: #ffffff;
             border: none;
             padding: 10px 20px;
-            border-radius: 6px;
+            border-radius: 8px;
             font-size: 13px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
         }
 
         .btn-ai:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-ai:active {
+            transform: translateY(0);
         }
 
         .btn-ai:disabled {
-            background: rgba(99, 102, 241, 0.3);
+            opacity: 0.6;
             cursor: not-allowed;
             transform: none;
+        }
+
+        .ai-icon {
+            font-size: 16px;
+            animation: pulse-ai 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-ai {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
         }
 
         .empty-state-text {
@@ -878,13 +1084,23 @@ export class PanelManager {
         // Handle messages from extension
         window.addEventListener('message', event => {
             const message = event.data;
+            console.log('[Webview] Received message:', message.type);
 
             if (message.type === 'updateResults') {
-                updateResults(message.data);
+                console.log('[Webview] updateResults message received with data:', message.data);
+                try {
+                    updateResults(message.data);
+                    console.log('[Webview] updateResults completed successfully');
+                } catch (error) {
+                    console.error('[Webview] Error in updateResults:', error);
+                }
             }
         });
 
         function updateResults(results) {
+            console.log('Received results:', results);
+            console.log('Imports data:', results.imports);
+
             // Update summary
             document.getElementById('summary').style.display = 'flex';
             document.getElementById('totalIssues').textContent = results.summary.totalIssues;
@@ -961,23 +1177,26 @@ export class PanelManager {
         }
 
         function updateImportsTab(issues) {
+            console.log('updateImportsTab called with:', issues);
             const container = document.getElementById('imports');
             currentImports = issues; // Store for AI suggestion requests
 
-            if (issues.length === 0) {
+            if (!issues || issues.length === 0) {
+                console.log('No imports found, showing empty state');
                 container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✅</div><div class="empty-state-text">No imports found or all imports are optimal!</div></div>';
                 return;
             }
+            console.log('Processing', issues.length, 'imports');
 
             container.innerHTML = '<div class="issue-list">' + issues.map((issue, index) => {
                 const sizeInfo = issue.sizeKb !== undefined && issue.sizeKb !== null
-                    ? \`<span class="size-badge">\${issue.sizeKb} KB</span>\`
+                    ? '<span class="size-badge">' + issue.sizeKb + ' KB</span>'
                     : '<span class="size-badge external">External Package</span>';
 
                 const importedItemsText = issue.importedItems.join(', ');
 
-                const title = \`Import from <code>\${escapeHtml(issue.source)}</code> \${sizeInfo}\`;
-                const details = \`Imported items: <strong>\${escapeHtml(importedItemsText)}</strong>\`;
+                const title = 'Import from <code>' + escapeHtml(issue.source) + '</code> ' + sizeInfo;
+                const details = 'Imported items: <strong>' + escapeHtml(importedItemsText) + '</strong>';
 
                 return createImportCard({
                     issue: issue,
@@ -1001,59 +1220,134 @@ export class PanelManager {
                 const suggestion = issue.aiSuggestion;
                 const typeLabel = suggestion.optimizationType.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
                 const savingsText = suggestion.potentialSavings
-                    ? \` (Save ~\${suggestion.potentialSavings} KB)\`
+                    ? ' (Save ~' + suggestion.potentialSavings + ' KB)'
                     : '';
 
-                aiSuggestionHtml = \`
-                    <div class="ai-suggestion-panel">
-                        <div class="ai-suggestion-header">
-                            <span class="ai-badge">🤖 AI Suggestion: \${typeLabel}\${savingsText}</span>
-                            <span class="confidence-badge confidence-\${suggestion.confidence}">\${suggestion.confidence} confidence</span>
-                        </div>
-                        <div class="ai-explanation">\${escapeHtml(suggestion.explanation)}</div>
-                        <div class="code-diff">
-                            <div class="code-section">
-                                <div class="code-label">Current:</div>
-                                <pre class="code-block code-original"><code>\${escapeHtml(suggestion.codeChange.original)}</code></pre>
-                            </div>
-                            <div class="code-section">
-                                <div class="code-label">Suggested:</div>
-                                <pre class="code-block code-suggested"><code>\${escapeHtml(suggestion.codeChange.suggested)}</code></pre>
-                            </div>
-                        </div>
-                        <div class="ai-reasoning"><strong>Why:</strong> \${escapeHtml(suggestion.reasoning)}</div>
-                        \${suggestion.alternativePackage ? \`<div class="alternative-package">💡 Alternative: <code>\${escapeHtml(suggestion.alternativePackage)}</code></div>\` : ''}
-                        <div class="ai-actions">
-                            <button class="btn btn-primary" onclick="applyImportSuggestion(\${index})">Apply Suggestion</button>
-                            <button class="btn" onclick="dismissSuggestion(\${index})">Dismiss</button>
-                        </div>
-                    </div>
-                \`;
+                aiSuggestionHtml = '<div class="ai-suggestion-panel">' +
+                    '<div class="ai-suggestion-header">' +
+                        '<span class="ai-badge">🤖 AI Suggestion: ' + typeLabel + savingsText + '</span>' +
+                        '<span class="confidence-badge confidence-' + suggestion.confidence + '">' + suggestion.confidence + ' confidence</span>' +
+                    '</div>' +
+                    '<div class="ai-explanation">' + escapeHtml(suggestion.explanation) + '</div>' +
+                    '<div class="code-diff">' +
+                        '<div class="code-section">' +
+                            '<div class="code-label">Current:</div>' +
+                            '<pre class="code-block code-original"><code>' + highlightCode(suggestion.codeChange.original) + '</code></pre>' +
+                        '</div>' +
+                        '<div class="code-section">' +
+                            '<div class="code-label">Suggested:</div>' +
+                            '<pre class="code-block code-suggested"><code>' + highlightCode(suggestion.codeChange.suggested) + '</code></pre>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="ai-reasoning"><strong>Why:</strong> ' + escapeHtml(suggestion.reasoning) + '</div>' +
+                    (suggestion.alternativePackage ? '<div class="alternative-package">💡 Alternative: <code>' + escapeHtml(suggestion.alternativePackage) + '</code></div>' : '') +
+                    (suggestion.potentialSavings && issue.sizeKb ?
+                        '<div class="comparison-table">' +
+                            '<div class="comparison-header">' +
+                                '<div class="col-label">Metric</div>' +
+                                '<div class="col-before">Current</div>' +
+                                '<div class="col-after">After Optimization</div>' +
+                            '</div>' +
+                            '<div class="comparison-row">' +
+                                '<div class="col-label">Bundle Size</div>' +
+                                '<div class="col-before">' + issue.sizeKb + ' KB</div>' +
+                                '<div class="col-after">' + (issue.sizeKb - suggestion.potentialSavings) + ' KB</div>' +
+                            '</div>' +
+                            '<div class="comparison-row highlight">' +
+                                '<div class="col-label">Savings</div>' +
+                                '<div class="col-before">-</div>' +
+                                '<div class="col-after savings">-' + suggestion.potentialSavings + ' KB (' + Math.round((suggestion.potentialSavings / issue.sizeKb) * 100) + '%)</div>' +
+                            '</div>' +
+                        '</div>'
+                    : '') +
+                    '<div class="ai-actions">' +
+                        '<button class="btn btn-primary" onclick="applyImportSuggestion(' + index + ')">Apply Suggestion</button>' +
+                        '<button class="btn" onclick="copyImportSuggestion(' + index + ')">📋 Copy Code</button>' +
+                        '<button class="btn" onclick="learnMoreAbout(' + index + ')">🔍 Learn More</button>' +
+                        '<button class="btn" onclick="dismissSuggestion(' + index + ')">Dismiss</button>' +
+                    '</div>' +
+                '</div>';
             } else {
                 // Show button to request AI suggestion
-                aiSuggestionHtml = \`
-                    <div class="ai-suggestion-request">
-                        <button class="btn btn-ai" onclick="requestImportSuggestion(\${index})" id="suggest-btn-\${index}">
-                            🤖 Get AI Optimization Suggestion
-                        </button>
-                    </div>
-                \`;
+                aiSuggestionHtml = '<div class="ai-suggestion-request">' +
+                    '<button class="btn btn-ai" onclick="requestImportSuggestion(' + index + ')" id="suggest-btn-' + index + '">' +
+                        '<span class="ai-icon">⚡</span>' +
+                        '<span>Get AI Suggestion</span>' +
+                    '</button>' +
+                '</div>';
             }
 
-            return \`
-                <div class="issue-card \${severityClass}" data-import-index="\${index}">
-                    <div class="issue-header">
-                        <div class="issue-title">\${title}</div>
-                        <span class="severity-badge \${severityClass}">\${severity}</span>
-                    </div>
-                    <div class="issue-details">\${details}</div>
-                    <div class="issue-location">\${escapeHtml(file)}:\${line}</div>
-                    <div class="issue-actions">
-                        <button class="btn btn-secondary" onclick="goToCode('\${escapeHtml(file)}', \${line})">📍 Go to Code</button>
-                    </div>
-                    \${aiSuggestionHtml}
-                </div>
-            \`;
+            // Create usage context display
+            let usageHtml = '';
+            if (issue.usageContext) {
+                const usageItems = [];
+                for (const [itemName, usages] of Object.entries(issue.usageContext)) {
+                    const isUnused = !usages || usages.length === 0;
+                    const usageClass = isUnused ? 'unused' : '';
+
+                    let itemHtml = '<div class="usage-item ' + usageClass + '">';
+                    itemHtml += '<span class="usage-name">' + escapeHtml(itemName) + '</span>';
+
+                    if (isUnused) {
+                        itemHtml += '<span class="usage-badge unused">Not Used</span>';
+                    } else {
+                        itemHtml += '<span class="usage-badge used">' + usages.length + '×</span>';
+                        itemHtml += '<div class="usage-examples">';
+
+                        // Show first 3 usages
+                        const usageCodes = usages.slice(0, 3).map(function(usage) {
+                            return '<code class="usage-code">Line ' + usage.line + ': ' + escapeHtml(usage.code_snippet) + '</code>';
+                        }).join('');
+                        itemHtml += usageCodes;
+
+                        if (usages.length > 3) {
+                            itemHtml += '<span class="usage-more">+' + (usages.length - 3) + ' more usage(s)</span>';
+                        }
+
+                        itemHtml += '</div>';
+                    }
+
+                    itemHtml += '</div>';
+                    usageItems.push(itemHtml);
+                }
+
+                usageHtml = '<div class="usage-context">' +
+                    '<div class="usage-header">📦 Usage in this file:</div>' +
+                    usageItems.join('') +
+                    '</div>';
+            }
+
+            // Create documentation links
+            const packageName = issue.source.replace(/^['"]|['"]$/g, '').split('/')[0].replace('@', '');
+            const linksHtml = '<div class="action-links">' +
+                '<a href="https://bundlephobia.com/package/' + encodeURIComponent(issue.source) + '" target="_blank" class="action-link">' +
+                    '📊 Bundle Size' +
+                '</a>' +
+                '<a href="https://www.npmjs.com/package/' + encodeURIComponent(issue.source) + '" target="_blank" class="action-link">' +
+                    '📦 NPM Page' +
+                '</a>' +
+                '<a href="https://www.google.com/search?q=' + encodeURIComponent(issue.source + ' documentation') + '" target="_blank" class="action-link">' +
+                    '📚 Documentation' +
+                '</a>' +
+            '</div>';
+
+            // Escape file path for safe attribute usage
+            const safeFile = file.replace(/\\\\/g, '\\\\\\\\').replace(/'/g, "\\\\'");
+
+            return '<div class="issue-card ' + severityClass + '" data-import-index="' + index + '">' +
+                '<div class="issue-header">' +
+                    '<div class="issue-title">' + title + '</div>' +
+                    '<span class="severity-badge ' + severityClass + '">' + severity + '</span>' +
+                '</div>' +
+                '<div class="issue-details">' + details + '</div>' +
+                '<div class="issue-location">' + escapeHtml(file) + ':' + line + '</div>' +
+                usageHtml +
+                '<div class="issue-actions">' +
+                    '<button class="btn btn-secondary" onclick="goToCode(\'' + safeFile + '\', ' + line + ')">📍 Go to Code</button>' +
+                '</div>' +
+                linksHtml +
+                aiSuggestionHtml +
+            '</div>';
         }
 
         function escapeHtml(text) {
@@ -1064,6 +1358,45 @@ export class PanelManager {
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#039;');
+        }
+
+        function highlightCode(code) {
+            if (!code) return '';
+
+            // Escape HTML first
+            let highlighted = escapeHtml(code);
+
+            // Highlight keywords (import, from, const, let, var, export, default, etc.)
+            highlighted = highlighted.replace(
+                /\b(import|from|const|let|var|export|default|async|await|function|return|if|else|for|while|class|extends|new|this|super)\b/g,
+                '<span class="keyword">$1</span>'
+            );
+
+            // Highlight strings ('...' or "..." or \`...\`)
+            highlighted = highlighted.replace(
+                /(["'\`])((?:\\\\.|(?!\\1)[^\\\\])*?)\\1/g,
+                '<span class="string">$1$2$1</span>'
+            );
+
+            // Highlight function names (word followed by ()
+            highlighted = highlighted.replace(
+                /\b([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/g,
+                '<span class="function">$1</span>('
+            );
+
+            // Highlight component names (PascalCase)
+            highlighted = highlighted.replace(
+                /\b([A-Z][a-zA-Z0-9_]*)\b/g,
+                '<span class="variable">$1</span>'
+            );
+
+            // Highlight comments
+            highlighted = highlighted.replace(
+                /(\/\/.*$)/gm,
+                '<span class="comment">$1</span>'
+            );
+
+            return highlighted;
         }
 
         function getStyleIssueTitle(issue) {
@@ -1156,7 +1489,7 @@ export class PanelManager {
         let currentImports = [];
 
         function requestImportSuggestion(index) {
-            const btn = document.getElementById(\`suggest-btn-\${index}\`);
+            const btn = document.getElementById('suggest-btn-' + index);
             if (btn) {
                 btn.disabled = true;
                 btn.textContent = '⏳ Requesting AI Suggestion...';
@@ -1183,8 +1516,50 @@ export class PanelManager {
             });
         }
 
+        function copyImportSuggestion(index) {
+            const issue = currentImports[index];
+            if (!issue || !issue.aiSuggestion) return;
+
+            const suggestedCode = issue.aiSuggestion.codeChange.suggested;
+
+            // Use modern clipboard API
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(suggestedCode).then(() => {
+                    // Visual feedback
+                    const btn = event.target.closest('button');
+                    const originalText = btn.innerHTML;
+                    btn.innerHTML = '✓ Copied!';
+                    btn.style.background = '#22c55e';
+
+                    setTimeout(() => {
+                        btn.innerHTML = originalText;
+                        btn.style.background = '';
+                    }, 2000);
+                }).catch(err => {
+                    console.error('Failed to copy:', err);
+                });
+            }
+        }
+
+        function learnMoreAbout(index) {
+            const issue = currentImports[index];
+            if (!issue) return;
+
+            let searchQuery = issue.source;
+            const alternativePackage = issue.aiSuggestion && issue.aiSuggestion.alternativePackage;
+
+            if (alternativePackage) {
+                searchQuery = alternativePackage + ' vs ' + issue.source + ' bundle size comparison';
+            } else {
+                searchQuery = 'optimize ' + issue.source + ' bundle size';
+            }
+
+            const searchUrl = 'https://www.google.com/search?q=' + encodeURIComponent(searchQuery);
+            window.open(searchUrl, '_blank');
+        }
+
         function dismissSuggestion(index) {
-            const card = document.querySelector(\`[data-import-index="\${index}"]\`);
+            const card = document.querySelector('[data-import-index="' + index + '"]');
             if (card) {
                 const suggestionPanel = card.querySelector('.ai-suggestion-panel');
                 if (suggestionPanel) {

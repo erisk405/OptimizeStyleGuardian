@@ -140,6 +140,7 @@ export class ScanCommand {
         duplicateStyles: true,
         designSystem: true,
         performance: true,
+        importAnalysis: true,
       }),
       excludePatterns: config.get("excludePatterns", [
         "**/node_modules/**",

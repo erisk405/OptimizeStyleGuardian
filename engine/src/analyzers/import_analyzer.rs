@@ -1,3 +1,4 @@
+use crate::analyzers::usage_extractor::extract_component_usage;
 use crate::parsers::typescript::{
     calculate_import_size, parse_typescript_imports, ImportStatement,
 };
@@ -41,6 +42,9 @@ pub fn analyze_file_imports<P: AsRef<Path>>(
             );
         }
 
+        // Extract usage context for imported items
+        let usage_context = extract_component_usage(path_ref, &import.imported_items).ok();
+
         // Create issue based on analysis
         let (severity, message) = determine_issue(&import, config);
 
@@ -53,6 +57,7 @@ pub fn analyze_file_imports<P: AsRef<Path>>(
             resolved_path: import.resolved_path.clone(),
             severity,
             message,
+            usage_context,
         });
     }
 
