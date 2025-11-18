@@ -1,25 +1,49 @@
 import * as vscode from "vscode";
 import { ScanCommand } from "./commands/scanCommand";
+import { ImportCommand } from "./commands/importCommand";
 import { PanelManager } from "./webview/panelManager";
 import { ApiKeyManager } from "./config/apiKeyManager";
 import { GitHookManager } from "./gitHooks/hookManager";
+import { ImportDecorator } from "./decorations/importDecorator";
+import { RustBridge } from "./rustBridge";
 
 let statusBarItem: vscode.StatusBarItem;
+let importStatusBarItem: vscode.StatusBarItem;
+let importDecorator: ImportDecorator;
 
 export function activate(context: vscode.ExtensionContext) {
   console.log("Go5 Style Guardian is now active!");
 
   const apiKeyManager = new ApiKeyManager(context);
   const panelManager = new PanelManager(context);
+  const rustBridge = new RustBridge(context);
   const scanCommand = new ScanCommand(context, panelManager, apiKeyManager);
   const hookManager = new GitHookManager(context);
 
-  // Create status bar item
+  // Create import decorator first
+  importDecorator = new ImportDecorator();
+  context.subscriptions.push(importDecorator);
+
+  const importCommand = new ImportCommand(context, rustBridge, importDecorator);
+
+  // Create status bar items
   statusBarItem = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Left,
     100,
   );
   context.subscriptions.push(statusBarItem);
+
+  importStatusBarItem = vscode.window.createStatusBarItem(
+    vscode.StatusBarAlignment.Right,
+    100,
+  );
+  importStatusBarItem.command = "go5StyleGuardian.openPanel";
+  context.subscriptions.push(importStatusBarItem);
+
+  // Check configuration for inline decorations
+  const config = vscode.workspace.getConfiguration("go5StyleGuardian");
+  const showInlineDecorations = config.get("showInlineImportCost", false);
+  importDecorator.setEnabled(showInlineDecorations);
 
   // Update status bar
   updateHookStatus(hookManager);
@@ -102,6 +126,22 @@ export function activate(context: vscode.ExtensionContext) {
     ),
   );
 
+  // Import analysis commands
+  context.subscriptions.push(
+    vscode.commands.registerCommand("go5StyleGuardian.checkImportSize", () => {
+      importCommand.checkImportAtCursor();
+    }),
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "go5StyleGuardian.analyzeAllImports",
+      () => {
+        importCommand.analyzeAllImports();
+      },
+    ),
+  );
+
   // Prompt to install git hook if not installed
   checkAndPromptGitHook(context, hookManager);
 
@@ -161,6 +201,37 @@ async function updateHookStatus(hookManager: GitHookManager) {
     ? "go5StyleGuardian.uninstallGitHook"
     : "go5StyleGuardian.installGitHook";
   statusBarItem.show();
+}
+
+export function updateImportStatus(totalImports: number, largeImports: number) {
+  if (totalImports === 0) {
+    importStatusBarItem.hide();
+    return;
+  }
+
+  if (largeImports > 0) {
+    importStatusBarItem.text = `$(package) ${largeImports} large import${largeImports > 1 ? "s" : ""}`;
+    importStatusBarItem.tooltip = `${totalImports} total imports, ${largeImports} exceed size threshold (click to view details)`;
+    importStatusBarItem.backgroundColor = new vscode.ThemeColor(
+      "statusBarItem.warningBackground",
+    );
+  } else {
+    importStatusBarItem.text = `$(check) ${totalImports} import${totalImports > 1 ? "s" : ""}`;
+    importStatusBarItem.tooltip = `${totalImports} imports analyzed, all within size limits`;
+    importStatusBarItem.backgroundColor = undefined;
+  }
+
+  importStatusBarItem.show();
+}
+
+export function updateImportDecorations(
+  editor: vscode.TextEditor,
+  imports: any[],
+  threshold: number,
+) {
+  if (importDecorator) {
+    importDecorator.updateDecorations(editor, imports, threshold);
+  }
 }
 
 async function checkAndPromptGitHook(

@@ -1,13 +1,14 @@
-mod parsers;
+mod analyzers;
+mod config;
 mod detectors;
 mod lighthouse_rules;
-mod config;
-mod types;
+mod parsers;
 mod scanner;
+mod types;
 
+use anyhow::Result;
 use clap::Parser;
 use std::path::PathBuf;
-use anyhow::Result;
 
 #[derive(Parser, Debug)]
 #[command(name = "go5_engine")]
@@ -53,6 +54,10 @@ struct Args {
     #[arg(long)]
     disable_performance: bool,
 
+    /// Disable import analysis
+    #[arg(long)]
+    disable_imports: bool,
+
     /// Exclude patterns (glob)
     #[arg(long = "exclude", num_args = 0..)]
     exclude_patterns: Vec<String>,
@@ -82,6 +87,7 @@ fn main() -> Result<()> {
             duplicate_styles: !args.disable_duplicates,
             design_system: !args.disable_design_system,
             performance: !args.disable_performance,
+            import_analysis: !args.disable_imports,
         },
         exclude_patterns: args.exclude_patterns,
     };

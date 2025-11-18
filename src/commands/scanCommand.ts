@@ -2,10 +2,11 @@ import * as vscode from "vscode";
 import * as path from "path";
 import { RustBridge } from "../rustBridge";
 import { PanelManager } from "../webview/panelManager";
-import { ScanOptions } from "../types";
+import { ScanOptions, AnalysisResult } from "../types";
 import { ApiKeyManager } from "../config/apiKeyManager";
 import { AnthropicService } from "../services/anthropicService";
 import { IssueEnhancer } from "../services/issueEnhancer";
+import { updateImportStatus, updateImportDecorations } from "../extension";
 
 export class ScanCommand {
   private rustBridge: RustBridge;
@@ -16,6 +17,24 @@ export class ScanCommand {
     private apiKeyManager: ApiKeyManager,
   ) {
     this.rustBridge = new RustBridge(context);
+  }
+
+  private updateImportStatusBar(result: AnalysisResult) {
+    const totalImports = result.imports?.length || 0;
+    const largeImports =
+      result.imports?.filter(
+        (imp) => imp.severity === "warning" || imp.severity === "error",
+      ).length || 0;
+
+    updateImportStatus(totalImports, largeImports);
+
+    // Update inline decorations for active editor
+    const editor = vscode.window.activeTextEditor;
+    if (editor && result.imports) {
+      const config = vscode.workspace.getConfiguration("go5StyleGuardian");
+      const threshold = config.get("importSizeThreshold", 100);
+      updateImportDecorations(editor, result.imports, threshold);
+    }
   }
 
   async scanCurrentFile(uri?: vscode.Uri) {
@@ -180,10 +199,12 @@ export class ScanCommand {
                   // Show panel with enhanced results
                   this.panelManager.showPanel();
                   this.panelManager.updateResults(enhancedResult);
+                  this.updateImportStatusBar(enhancedResult);
                 } else {
                   // Show normal results if key retrieval fails
                   this.panelManager.showPanel();
                   this.panelManager.updateResults(result);
+                  this.updateImportStatusBar(result);
                 }
               } catch (aiError) {
                 console.error("AI enhancement failed:", aiError);
@@ -192,6 +213,7 @@ export class ScanCommand {
                 );
                 this.panelManager.showPanel();
                 this.panelManager.updateResults(result);
+                this.updateImportStatusBar(result);
               }
             } else {
               // No API key configured
@@ -209,11 +231,13 @@ export class ScanCommand {
 
               this.panelManager.showPanel();
               this.panelManager.updateResults(result);
+              this.updateImportStatusBar(result);
             }
           } else {
             // AI disabled, show normal results
             this.panelManager.showPanel();
             this.panelManager.updateResults(result);
+            this.updateImportStatusBar(result);
           }
 
           // Show summary notification

@@ -7,7 +7,23 @@ pub struct AnalysisResult {
     #[serde(rename = "designSystem")]
     pub design_system: Vec<DesignSystemIssue>,
     pub performance: Vec<PerformanceIssue>,
+    pub imports: Vec<ImportAnalysisIssue>,
     pub summary: AnalysisSummary,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportAnalysisIssue {
+    pub file: String,
+    pub line: usize,
+    #[serde(rename = "importedItems")]
+    pub imported_items: Vec<String>,
+    pub source: String,
+    #[serde(skip_serializing_if = "Option::is_none", rename = "sizeKb")]
+    pub size_kb: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none", rename = "resolvedPath")]
+    pub resolved_path: Option<String>,
+    pub severity: String,
+    pub message: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -83,6 +99,8 @@ pub struct AnalysisSummary {
     pub design_system_count: usize,
     #[serde(rename = "performanceCount")]
     pub performance_count: usize,
+    #[serde(rename = "importCount")]
+    pub import_count: usize,
     #[serde(rename = "criticalCount")]
     pub critical_count: usize,
     #[serde(rename = "warningCount")]

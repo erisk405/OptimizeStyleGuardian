@@ -47,6 +47,14 @@
       {
         "command": "go5StyleGuardian.uninstallGitHook",
         "title": "Go5: Uninstall Git Pre-Commit Hook"
+      },
+      {
+        "command": "go5StyleGuardian.checkImportSize",
+        "title": "Go5: Check Import Size at Cursor"
+      },
+      {
+        "command": "go5StyleGuardian.analyzeAllImports",
+        "title": "Go5: Analyze All Imports in File"
       }
     ],
     "menus": {
@@ -60,6 +68,18 @@
           "command": "go5StyleGuardian.scanCurrentFile",
           "when": "!explorerResourceIsFolder",
           "group": "go5guardian@1"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "go5StyleGuardian.checkImportSize",
+          "when": "editorTextFocus && resourceExtname =~ /\\.(ts|tsx|js|jsx)$/",
+          "group": "go5guardian@1"
+        },
+        {
+          "command": "go5StyleGuardian.analyzeAllImports",
+          "when": "editorTextFocus && resourceExtname =~ /\\.(ts|tsx|js|jsx)$/",
+          "group": "go5guardian@2"
         }
       ]
     },
@@ -88,6 +108,16 @@
           "default": 500,
           "description": "Image file size threshold in KB"
         },
+        "go5StyleGuardian.importSizeThreshold": {
+          "type": "number",
+          "default": 100,
+          "description": "Import file size threshold in KB (warns about large imports)"
+        },
+        "go5StyleGuardian.showInlineImportCost": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show import size inline next to import statements (similar to Import Cost extension)"
+        },
         "go5StyleGuardian.designSystemConfigPath": {
           "type": "string",
           "default": "config/design-system.yml",
@@ -98,7 +128,8 @@
           "default": {
             "duplicateStyles": true,
             "designSystem": true,
-            "performance": true
+            "performance": true,
+            "importAnalysis": true
           },
           "description": "Enable or disable specific analysis categories"
         },
