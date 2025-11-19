@@ -3,13 +3,19 @@ import * as path from "path";
 import { AnalysisResult, ImportAnalysisIssue } from "../types";
 import { IssueEnhancer } from "../services/issueEnhancer";
 import { AnthropicService } from "../services/anthropicService";
+import { ApiKeyManager } from "../config/apiKeyManager";
+import { ComponentRegistry } from "../services/componentRegistry";
 
 export class PanelManager {
   private panel: vscode.WebviewPanel | undefined;
   private currentResults: AnalysisResult | undefined;
   private issueEnhancer: IssueEnhancer | undefined;
 
-  constructor(private context: vscode.ExtensionContext) {}
+  constructor(
+    private context: vscode.ExtensionContext,
+    private apiKeyManager: ApiKeyManager,
+    private componentRegistry?: ComponentRegistry,
+  ) {}
 
   public showPanel() {
     if (this.panel) {
@@ -39,6 +45,9 @@ export class PanelManager {
         retainContextWhenHidden: true,
         localResourceRoots: [
           vscode.Uri.file(path.join(this.context.extensionPath, "media")),
+          vscode.Uri.file(
+            path.join(this.context.extensionPath, "src", "webview", "styles"),
+          ),
         ],
       },
     );
@@ -104,11 +113,8 @@ export class PanelManager {
     try {
       console.log("goToCode received:", { file, line, column });
 
-      // Normalize the file path (remove double backslashes)
-      const normalizedPath = file.replace(/\\\\/g, "\\");
-      console.log("Normalized path:", normalizedPath);
-
-      const document = await vscode.workspace.openTextDocument(normalizedPath);
+      // Use the file path as-is - VSCode handles both forward and backslashes
+      const document = await vscode.workspace.openTextDocument(file);
       const editor = await vscode.window.showTextDocument(
         document,
         vscode.ViewColumn.One,
@@ -124,7 +130,7 @@ export class PanelManager {
         vscode.TextEditorRevealType.InCenter,
       );
 
-      console.log("Successfully navigated to:", normalizedPath, "line:", line);
+      console.log("Successfully navigated to:", file, "line:", line);
     } catch (error) {
       console.error("Error opening file:", error);
       vscode.window.showErrorMessage(
@@ -224,11 +230,11 @@ export class PanelManager {
       // Initialize IssueEnhancer if needed
       if (!this.issueEnhancer) {
         const config = vscode.workspace.getConfiguration("go5StyleGuardian");
-        const apiKey = config.get<string>("anthropicApiKey");
+        const apiKey = await this.apiKeyManager.getApiKey();
 
         if (!apiKey) {
           vscode.window.showErrorMessage(
-            "Please set your Anthropic API key in settings (go5StyleGuardian.anthropicApiKey)",
+            "Anthropic API key not configured. Please run 'Go5: Configure API Key' command.",
           );
           return;
         }
@@ -245,11 +251,12 @@ export class PanelManager {
           anthropicService,
           maxIssues,
           contextLines,
+          this.componentRegistry,
         );
       }
 
       // Request AI suggestion
-      vscode.window.showInformationMessage("🤖 Requesting AI suggestion...");
+      vscode.window.showInformationMessage("Requesting AI suggestion...");
 
       const suggestion = await this.issueEnhancer.enhanceImportIssue(
         importIssue,
@@ -283,527 +290,33 @@ export class PanelManager {
   }
 
   private getWebviewContent(): string {
+    // Get URIs for CSS files
+    const stylesPath = vscode.Uri.file(
+      path.join(this.context.extensionPath, "src", "webview", "styles"),
+    );
+
+    const mainCssUri = this.panel!.webview.asWebviewUri(
+      vscode.Uri.file(path.join(stylesPath.fsPath, "main.css")),
+    );
+    const componentsCssUri = this.panel!.webview.asWebviewUri(
+      vscode.Uri.file(path.join(stylesPath.fsPath, "components.css")),
+    );
+    const aiSuggestionsCssUri = this.panel!.webview.asWebviewUri(
+      vscode.Uri.file(path.join(stylesPath.fsPath, "ai-suggestions.css")),
+    );
+
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Go5 Style Guardian</title>
-    <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            font-size: 13px;
-            color: #e1e1e1;
-            background: #0a0a0a;
-            padding: 20px;
-            line-height: 1.5;
-        }
-
-        h1 {
-            font-size: 20px;
-            font-weight: 600;
-            margin-bottom: 20px;
-            color: #ffffff;
-            letter-spacing: -0.3px;
-        }
-
-        .tabs {
-            display: flex;
-            gap: 0;
-            margin-bottom: 16px;
-            border-bottom: 1px solid #2a2a2a;
-        }
-
-        .tab {
-            padding: 8px 16px;
-            cursor: pointer;
-            background: transparent;
-            border: none;
-            color: #888888;
-            font-size: 13px;
-            font-weight: 500;
-            border-bottom: 2px solid transparent;
-            transition: all 0.2s ease;
-        }
-
-        .tab:hover {
-            color: #e1e1e1;
-        }
-
-        .tab.active {
-            color: #ffffff;
-            border-bottom-color: #ffffff;
-        }
-
-        .tab-content {
-            display: none;
-        }
-
-        .tab-content.active {
-            display: block;
-        }
-
-        .summary {
-            background: #141414;
-            padding: 16px;
-            border-radius: 8px;
-            margin-bottom: 16px;
-            display: flex;
-            gap: 32px;
-            flex-wrap: wrap;
-            border: 1px solid #2a2a2a;
-        }
-
-        .summary-item {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .summary-label {
-            font-size: 11px;
-            color: #888888;
-            font-weight: 500;
-        }
-
-        .summary-value {
-            font-size: 24px;
-            font-weight: 600;
-            color: #ffffff;
-        }
-
-        .summary-value.critical {
-            color: #ef4444;
-        }
-
-        .summary-value.warning {
-            color: #f59e0b;
-        }
-
-        .issue-list {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .issue-card {
-            background: #141414;
-            padding: 16px;
-            border-radius: 8px;
-            border-left: 2px solid #2a2a2a;
-            border: 1px solid #2a2a2a;
-            transition: border-color 0.2s ease;
-        }
-
-        .issue-card:hover {
-            border-color: #3a3a3a;
-        }
-
-        .issue-card.critical {
-            border-left-color: #ef4444;
-        }
-
-        .issue-card.warning {
-            border-left-color: #f59e0b;
-        }
-
-        .issue-card.info {
-            border-left-color: #6366f1;
-        }
-
-        .issue-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 8px;
-            gap: 12px;
-        }
-
-        .issue-title {
-            font-weight: 500;
-            font-size: 13px;
-            color: #ffffff;
-            line-height: 1.5;
-            flex: 1;
-        }
-
-        .severity-badge {
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 10px;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-        }
-
-        .severity-badge.critical {
-            background: rgba(239, 68, 68, 0.15);
-            color: #ef4444;
-        }
-
-        .severity-badge.warning {
-            background: rgba(245, 158, 11, 0.15);
-            color: #f59e0b;
-        }
-
-        .severity-badge.info {
-            background: rgba(99, 102, 241, 0.15);
-            color: #6366f1;
-        }
-
-        .size-badge {
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: 600;
-            background: rgba(34, 197, 94, 0.15);
-            color: #22c55e;
-            margin-left: 8px;
-        }
-
-        .size-badge.external {
-            background: rgba(148, 163, 184, 0.15);
-            color: #94a3b8;
-        }
-
-        .issue-details {
-            font-size: 12px;
-            margin-bottom: 8px;
-            color: #a1a1a1;
-            line-height: 1.5;
-        }
-
-        .issue-location {
-            font-size: 11px;
-            color: #6b7280;
-            margin-bottom: 12px;
-            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
-        }
-
-        .issue-actions {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-
-        .btn {
-            padding: 6px 12px;
-            border: 1px solid #2a2a2a;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 12px;
-            font-weight: 500;
-            transition: all 0.2s ease;
-            background: transparent;
-        }
-
-        .btn:hover {
-            border-color: #3a3a3a;
-            background: #1a1a1a;
-        }
-
-        .btn-primary {
-            color: #ffffff;
-        }
-
-        .btn-secondary {
-            color: #a1a1a1;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: #6b7280;
-        }
-
-        .empty-state-icon {
-            font-size: 48px;
-            margin-bottom: 12px;
-            opacity: 0.4;
-        }
-
-        /* AI Suggestion Styles */
-        .ai-suggestion-panel {
-            margin-top: 16px;
-            padding: 16px;
-            background: rgba(99, 102, 241, 0.05);
-            border: 1px solid rgba(99, 102, 241, 0.2);
-            border-radius: 6px;
-        }
-
-        .ai-suggestion-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-        }
-
-        .ai-badge {
-            background: rgba(99, 102, 241, 0.15);
-            color: #6366f1;
-            padding: 4px 10px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: 600;
-        }
-
-        .confidence-badge {
-            padding: 2px 8px;
-            border-radius: 3px;
-            font-size: 10px;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-
-        .confidence-high {
-            background: rgba(34, 197, 94, 0.15);
-            color: #22c55e;
-        }
-
-        .confidence-medium {
-            background: rgba(245, 158, 11, 0.15);
-            color: #f59e0b;
-        }
-
-        .confidence-low {
-            background: rgba(156, 163, 175, 0.15);
-            color: #9ca3af;
-        }
-
-        .ai-explanation {
-            margin: 12px 0;
-            color: #e1e1e1;
-            line-height: 1.6;
-        }
-
-        .code-diff {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin: 16px 0;
-        }
-
-        .code-section {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .code-label {
-            font-size: 11px;
-            font-weight: 600;
-            color: #888888;
-            margin-bottom: 6px;
-            text-transform: uppercase;
-        }
-
-        .code-block {
-            background: #1a1a1a;
-            border: 1px solid #2a2a2a;
-            border-radius: 4px;
-            padding: 12px;
-            margin: 0;
-            overflow-x: auto;
-            font-size: 12px;
-            line-height: 1.5;
-        }
-
-        .code-block code {
-            font-family: 'Courier New', monospace;
-            color: #e1e1e1;
-        }
-
-        .code-original {
-            border-left: 3px solid rgba(239, 68, 68, 0.5);
-        }
-
-        .code-suggested {
-            border-left: 3px solid rgba(34, 197, 94, 0.5);
-        }
-
-        .ai-reasoning {
-            margin: 12px 0;
-            padding: 10px;
-            background: rgba(0, 0, 0, 0.2);
-            border-left: 3px solid #6366f1;
-            color: #a1a1a1;
-            font-size: 12px;
-            line-height: 1.6;
-        }
-
-        .alternative-package {
-            margin: 12px 0;
-            padding: 8px 12px;
-            background: rgba(245, 158, 11, 0.1);
-            border-radius: 4px;
-            color: #f59e0b;
-            font-size: 12px;
-        }
-
-        .alternative-package code {
-            background: rgba(245, 158, 11, 0.2);
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-weight: 600;
-        }
-
-        .ai-actions {
-            display: flex;
-            gap: 8px;
-            margin-top: 12px;
-        }
-
-        .ai-suggestion-request {
-            margin-top: 12px;
-            text-align: center;
-        }
-
-        .btn-ai {
-            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-            color: #ffffff;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 6px;
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .btn-ai:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-        }
-
-        .btn-ai:disabled {
-            background: rgba(99, 102, 241, 0.3);
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .empty-state-text {
-            font-size: 13px;
-            color: #888888;
-        }
-
-        code {
-            background: #1a1a1a;
-            color: #e1e1e1;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
-            font-size: 12px;
-            border: 1px solid #2a2a2a;
-        }
-
-        /* AI Suggestion Styles */
-        .ai-suggestion {
-            margin-top: 12px;
-            padding: 12px;
-            background: #1a1a1a;
-            border: 1px solid #2a2a2a;
-            border-radius: 6px;
-        }
-
-        .ai-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 11px;
-            font-weight: 500;
-            color: #ffffff;
-            margin-bottom: 8px;
-        }
-
-        .ai-explanation {
-            font-size: 12px;
-            margin-bottom: 12px;
-            line-height: 1.5;
-            color: #a1a1a1;
-        }
-
-        .code-diff {
-            margin: 12px 0;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .code-block {
-            background: #0a0a0a;
-            border: 1px solid #2a2a2a;
-            border-radius: 6px;
-            padding: 10px;
-        }
-
-        .code-block .label {
-            display: block;
-            font-size: 10px;
-            font-weight: 500;
-            margin-bottom: 6px;
-            color: #888888;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .code-block.before .label {
-            color: #ef4444;
-        }
-
-        .code-block.after .label {
-            color: #10b981;
-        }
-
-        .code-block pre {
-            margin: 0;
-            padding: 0;
-            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
-            font-size: 12px;
-            line-height: 1.5;
-            white-space: pre-wrap;
-            word-break: break-word;
-            color: #e1e1e1;
-        }
-
-        .ai-reasoning {
-            font-size: 11px;
-            color: #888888;
-            margin-top: 8px;
-            font-style: italic;
-        }
-
-        .confidence-badge {
-            display: inline-block;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 9px;
-            font-weight: 500;
-            margin-left: 6px;
-        }
-
-        .confidence-badge.high {
-            background: rgba(16, 185, 129, 0.15);
-            color: #10b981;
-        }
-
-        .confidence-badge.medium {
-            background: rgba(245, 158, 11, 0.15);
-            color: #f59e0b;
-        }
-
-        .confidence-badge.low {
-            background: rgba(239, 68, 68, 0.15);
-            color: #ef4444;
-        }
-    </style>
+    <link rel="stylesheet" href="${mainCssUri}">
+    <link rel="stylesheet" href="${componentsCssUri}">
+    <link rel="stylesheet" href="${aiSuggestionsCssUri}">
 </head>
 <body>
-    <h1>🛡️ Go5 Style Guardian</h1>
+    <h1>Go5 Style Guardian</h1>
 
     <div id="summary" class="summary" style="display: none;">
         <div class="summary-item">
@@ -833,28 +346,28 @@ export class PanelManager {
 
     <div id="style-health" class="tab-content active">
         <div class="empty-state">
-            <div class="empty-state-icon">🎨</div>
+            <div class="empty-state-icon"></div>
             <div class="empty-state-text">Run a scan to see style health issues</div>
         </div>
     </div>
 
     <div id="design-system" class="tab-content">
         <div class="empty-state">
-            <div class="empty-state-icon">📐</div>
+            <div class="empty-state-icon"></div>
             <div class="empty-state-text">Run a scan to see design system recommendations</div>
         </div>
     </div>
 
     <div id="performance" class="tab-content">
         <div class="empty-state">
-            <div class="empty-state-icon">⚡</div>
+            <div class="empty-state-icon"></div>
             <div class="empty-state-text">Run a scan to see performance issues</div>
         </div>
     </div>
 
     <div id="imports" class="tab-content">
         <div class="empty-state">
-            <div class="empty-state-icon">📦</div>
+            <div class="empty-state-icon"></div>
             <div class="empty-state-text">Run a scan to see import analysis</div>
         </div>
     </div>
@@ -902,7 +415,7 @@ export class PanelManager {
         function updateStyleHealthTab(issues) {
             const container = document.getElementById('style-health');
             if (issues.length === 0) {
-                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✅</div><div class="empty-state-text">No duplicate styles found!</div></div>';
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon"></div><div class="empty-state-text">No duplicate styles found!</div></div>';
                 return;
             }
 
@@ -922,7 +435,7 @@ export class PanelManager {
         function updateDesignSystemTab(issues) {
             const container = document.getElementById('design-system');
             if (issues.length === 0) {
-                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✅</div><div class="empty-state-text">Design system compliance looks good!</div></div>';
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon"></div><div class="empty-state-text">Design system compliance looks good!</div></div>';
                 return;
             }
 
@@ -943,7 +456,7 @@ export class PanelManager {
         function updatePerformanceTab(issues) {
             const container = document.getElementById('performance');
             if (issues.length === 0) {
-                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✅</div><div class="empty-state-text">No performance issues detected!</div></div>';
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon"></div><div class="empty-state-text">No performance issues detected!</div></div>';
                 return;
             }
 
@@ -965,7 +478,7 @@ export class PanelManager {
             currentImports = issues; // Store for AI suggestion requests
 
             if (issues.length === 0) {
-                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✅</div><div class="empty-state-text">No imports found or all imports are optimal!</div></div>';
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon"></div><div class="empty-state-text">No imports found or all imports are optimal!</div></div>';
                 return;
             }
 
@@ -1007,7 +520,7 @@ export class PanelManager {
                 aiSuggestionHtml = \`
                     <div class="ai-suggestion-panel">
                         <div class="ai-suggestion-header">
-                            <span class="ai-badge">🤖 AI Suggestion: \${typeLabel}\${savingsText}</span>
+                            <span class="ai-badge">AI Suggestion: \${typeLabel}\${savingsText}</span>
                             <span class="confidence-badge confidence-\${suggestion.confidence}">\${suggestion.confidence} confidence</span>
                         </div>
                         <div class="ai-explanation">\${escapeHtml(suggestion.explanation)}</div>
@@ -1022,7 +535,7 @@ export class PanelManager {
                             </div>
                         </div>
                         <div class="ai-reasoning"><strong>Why:</strong> \${escapeHtml(suggestion.reasoning)}</div>
-                        \${suggestion.alternativePackage ? \`<div class="alternative-package">💡 Alternative: <code>\${escapeHtml(suggestion.alternativePackage)}</code></div>\` : ''}
+                        \${suggestion.alternativePackage ? \`<div class="alternative-package">Alternative: <code>\${escapeHtml(suggestion.alternativePackage)}</code></div>\` : ''}
                         <div class="ai-actions">
                             <button class="btn btn-primary" onclick="applyImportSuggestion(\${index})">Apply Suggestion</button>
                             <button class="btn" onclick="dismissSuggestion(\${index})">Dismiss</button>
@@ -1034,7 +547,7 @@ export class PanelManager {
                 aiSuggestionHtml = \`
                     <div class="ai-suggestion-request">
                         <button class="btn btn-ai" onclick="requestImportSuggestion(\${index})" id="suggest-btn-\${index}">
-                            🤖 Get AI Optimization Suggestion
+                            Get AI Optimization Suggestion
                         </button>
                     </div>
                 \`;
@@ -1049,7 +562,7 @@ export class PanelManager {
                     <div class="issue-details">\${details}</div>
                     <div class="issue-location">\${escapeHtml(file)}:\${line}</div>
                     <div class="issue-actions">
-                        <button class="btn btn-secondary" onclick="goToCode('\${escapeHtml(file)}', \${line})">📍 Go to Code</button>
+                        <button class="btn btn-secondary" onclick="goToCode('\${escapeJsString(file)}', \${line})">Go to Code</button>
                     </div>
                     \${aiSuggestionHtml}
                 </div>
@@ -1064,6 +577,24 @@ export class PanelManager {
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#039;');
+        }
+
+        function escapeJsString(text) {
+            if (!text) return '';
+            var result = '';
+            for (var i = 0; i < text.length; i++) {
+                var c = text.charAt(i);
+                switch (c) {
+                    case '\\\\': result += '\\\\\\\\'; break;
+                    case "'": result += "\\\\'"; break;
+                    case '"': result += '\\\\"'; break;
+                    case '\\n': result += '\\\\n'; break;
+                    case '\\r': result += '\\\\r'; break;
+                    case '\\t': result += '\\\\t'; break;
+                    default: result += c;
+                }
+            }
+            return result;
         }
 
         function getStyleIssueTitle(issue) {
@@ -1102,9 +633,11 @@ export class PanelManager {
         }
 
         function createIssueCard(issue) {
-            const displayFile = issue.file.replace(/\\\\/g, '\\\\');
-            const fileAttr = issue.file.replace(/"/g, '&quot;').replace(/\\\\/g, '\\\\');
-            const fixButton = issue.suggestion ? '<button class="btn btn-secondary" data-action="fix">🔧 Apply Fix</button>' : '';
+            // Use forward slashes for display (cross-platform)
+            const displayFile = issue.file.split('\\\\').join('/');
+            // For data attributes, just escape quotes - don't double-escape backslashes
+            const fileAttr = issue.file.split('"').join('&quot;');
+            const fixButton = issue.suggestion ? '<button class="btn btn-secondary" data-action="fix">Apply Fix</button>' : '';
 
             // AI Suggestion section
             let aiSuggestionHtml = '';
@@ -1113,24 +646,24 @@ export class PanelManager {
                 const confidenceBadge = '<span class="confidence-badge ' + ai.confidence + '">' + ai.confidence.toUpperCase() + '</span>';
 
                 aiSuggestionHtml = '<div class="ai-suggestion">' +
-                    '<div class="ai-badge">✨ AI Suggestion' + confidenceBadge + '</div>' +
+                    '<div class="ai-badge">AI Suggestion' + confidenceBadge + '</div>' +
                     '<div class="ai-explanation">' + escapeHtml(ai.explanation) + '</div>' +
                     '<div class="code-diff">' +
                     '<div class="code-block before">' +
-                    '<span class="label">❌ Current Code:</span>' +
+                    '<span class="label">Current Code:</span>' +
                     '<pre>' + escapeHtml(ai.codeChange.original) + '</pre>' +
                     '</div>' +
                     '<div class="code-block after">' +
-                    '<span class="label">✅ Suggested Code:</span>' +
+                    '<span class="label">Suggested Code:</span>' +
                     '<pre>' + escapeHtml(ai.codeChange.suggested) + '</pre>' +
                     '</div>' +
                     '</div>' +
-                    '<div class="ai-reasoning">💡 ' + escapeHtml(ai.reasoning) + '</div>' +
+                    '<div class="ai-reasoning">Reasoning: ' + escapeHtml(ai.reasoning) + '</div>' +
                     '<button class="btn btn-primary" data-action="apply-ai" data-file="' + fileAttr + '" ' +
                     'data-start-line="' + ai.codeChange.startLine + '" ' +
                     'data-end-line="' + ai.codeChange.endLine + '" ' +
-                    'data-suggested-code="' + escapeHtml(ai.codeChange.suggested).replace(/"/g, '&quot;') + '">' +
-                    '⚡ Apply AI Fix' +
+                    'data-suggested-code="' + escapeHtml(ai.codeChange.suggested).split('"').join('&quot;') + '">' +
+                    'Apply AI Fix' +
                     '</button>' +
                     '</div>';
             }
@@ -1144,7 +677,7 @@ export class PanelManager {
                 '<div class="issue-location">' + displayFile + ':' + (issue.line || '?') + (issue.column ? ':' + issue.column : '') + '</div>' +
                 '<div class="issue-actions">' +
                 '<button class="btn btn-primary" data-action="goto" data-file="' + fileAttr + '" data-line="' + (issue.line || 0) + '" data-column="' + (issue.column || 0) + '">' +
-                '🔍 Go to Code' +
+                'Go to Code' +
                 '</button>' +
                 fixButton +
                 '</div>' +
@@ -1159,7 +692,7 @@ export class PanelManager {
             const btn = document.getElementById(\`suggest-btn-\${index}\`);
             if (btn) {
                 btn.disabled = true;
-                btn.textContent = '⏳ Requesting AI Suggestion...';
+                btn.textContent = 'Requesting AI Suggestion...';
             }
 
             vscode.postMessage({

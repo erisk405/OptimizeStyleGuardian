@@ -102,7 +102,7 @@ async function validateStagedFiles(
     }
 
     if (!fs.existsSync(enginePath)) {
-      console.error("⚠️  Warning: Go5 engine not found, skipping validation");
+      console.error("Warning: Go5 engine not found, skipping validation");
       return {
         success: true,
         criticalCount: 0,
@@ -142,7 +142,7 @@ async function validateStagedFiles(
       });
 
       child.on("error", (error: Error) => {
-        console.error("⚠️  Warning: Failed to run Go5 engine:", error.message);
+        console.error("Warning: Failed to run Go5 engine:", error.message);
         resolve({
           success: true,
           criticalCount: 0,
@@ -154,7 +154,7 @@ async function validateStagedFiles(
 
       child.on("close", (code: number) => {
         if (code !== 0) {
-          console.error("⚠️  Warning: Engine exited with code", code);
+          console.error("Warning: Engine exited with code", code);
           console.error(stderr);
           resolve({
             success: true,
@@ -232,7 +232,7 @@ async function validateStagedFiles(
             issues: [...criticalIssues, ...errorIssues, ...warningIssues],
           });
         } catch (error) {
-          console.error("⚠️  Warning: Failed to parse engine output");
+          console.error("Warning: Failed to parse engine output");
           resolve({
             success: true,
             criticalCount: 0,
@@ -244,7 +244,7 @@ async function validateStagedFiles(
       });
     });
   } catch (error) {
-    console.error("⚠️  Warning: Validation error:", error);
+    console.error("Warning: Validation error:", error);
     return {
       success: true,
       criticalCount: 0,
@@ -292,7 +292,7 @@ async function main() {
   }
 
   if (shouldBlock) {
-    console.error(`\n❌ Commit blocked: Found ${blockReason}\n`);
+    console.error(`\n[X] Commit blocked: Found ${blockReason}\n`);
 
     // Show critical issues first
     const criticalIssues = result.issues.filter(
@@ -312,7 +312,7 @@ async function main() {
       );
     }
 
-    console.error(`\n💡 To bypass this check, use: git commit --no-verify\n`);
+    console.error(`\nTo bypass this check, use: git commit --no-verify\n`);
     process.exit(1);
   } else {
     // Show summary
@@ -336,7 +336,7 @@ async function main() {
       const warningIssues = result.issues
         .filter((i) => i.severity === "warning")
         .slice(0, 3);
-      console.log("\n⚠️  Warnings:");
+      console.log("\nWarnings:");
       warningIssues.forEach((issue) => {
         console.log(`  ${issue.file}:${issue.line} - ${issue.message}`);
       });

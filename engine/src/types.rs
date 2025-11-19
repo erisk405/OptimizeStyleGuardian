@@ -24,6 +24,14 @@ pub struct ImportAnalysisIssue {
     pub resolved_path: Option<String>,
     pub severity: String,
     pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none", rename = "itemUsage")]
+    pub item_usage: Option<HashMap<String, ItemUsage>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ItemUsage {
+    pub count: usize,
+    pub lines: Vec<usize>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

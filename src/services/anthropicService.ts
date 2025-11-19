@@ -116,6 +116,45 @@ export class AnthropicService {
   }
 
   /**
+   * Chat with Claude (for follow-up questions)
+   */
+  async chat(prompt: string, systemPrompt?: string): Promise<string | null> {
+    try {
+      const response = await this.client.messages.create({
+        model: this.model,
+        max_tokens: 2048,
+        system: systemPrompt
+          ? [
+              {
+                type: "text",
+                text: systemPrompt,
+                cache_control: { type: "ephemeral" } as any,
+              },
+            ]
+          : undefined,
+        messages: [
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        temperature: 0.5, // Slightly higher for conversational responses
+      } as any);
+
+      const content = response.content[0];
+      if (content.type !== "text") {
+        console.error("Unexpected response type from Claude");
+        return null;
+      }
+
+      return content.text;
+    } catch (error) {
+      console.error("Error calling Anthropic API:", error);
+      return null;
+    }
+  }
+
+  /**
    * Test API connection
    */
   async testConnection(): Promise<boolean> {

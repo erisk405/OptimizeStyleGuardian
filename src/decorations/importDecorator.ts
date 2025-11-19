@@ -72,7 +72,7 @@ export class ImportDecorator {
       if (imp.sizeKb !== undefined && imp.sizeKb !== null) {
         // Has size information
         const sizeText = this.formatSize(imp.sizeKb);
-        const contentText = ` 📦 ${sizeText}`;
+        const contentText = ` [${sizeText}]`;
 
         const decoration: vscode.DecorationOptions = {
           range,
@@ -91,7 +91,7 @@ export class ImportDecorator {
         }
       } else if (!imp.source.startsWith(".")) {
         // External package without size
-        const contentText = " 📦 external";
+        const contentText = " [external]";
 
         const decoration: vscode.DecorationOptions = {
           range,
@@ -167,7 +167,7 @@ export class ImportDecorator {
     }
 
     md.appendMarkdown(
-      "---\n\n💡 *Right-click and select 'Go5: Check Import Size' for more details*",
+      "---\n\n*Right-click and select 'Go5: Check Import Size' for more details*",
     );
 
     return md;

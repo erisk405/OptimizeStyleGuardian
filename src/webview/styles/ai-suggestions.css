@@ -1,0 +1,178 @@
+/* AI Suggestion styles for Go5 Style Guardian webview */
+
+/* AI Suggestion Panel */
+.ai-suggestion-panel {
+    margin-top: 20px;
+    padding: 20px;
+    background: rgba(99, 102, 241, 0.08);
+    border: 1px solid rgba(99, 102, 241, 0.25);
+    border-radius: 12px;
+    backdrop-filter: blur(10px);
+}
+
+.ai-suggestion-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.ai-badge {
+    background: rgba(99, 102, 241, 0.2);
+    color: #6366f1;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+.ai-explanation {
+    margin: 16px 0;
+    color: var(--text-primary);
+    line-height: 1.7;
+    font-size: 14px;
+}
+
+.ai-reasoning {
+    margin: 16px 0;
+    padding: 16px;
+    background: rgba(99, 102, 241, 0.05);
+    border-left: 4px solid #6366f1;
+    color: var(--text-secondary);
+    font-size: 13px;
+    line-height: 1.7;
+    border-radius: 8px;
+}
+
+.alternative-package {
+    margin: 16px 0;
+    padding: 12px 16px;
+    background: rgba(245, 158, 11, 0.1);
+    border-radius: 8px;
+    color: #f59e0b;
+    font-size: 13px;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.alternative-package code {
+    background: rgba(245, 158, 11, 0.2);
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-weight: 700;
+}
+
+.ai-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.ai-suggestion-request {
+    margin-top: 16px;
+    text-align: center;
+}
+
+/* AI Suggestion (Legacy) */
+.ai-suggestion {
+    margin-top: 16px;
+    padding: 16px;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+}
+
+.ai-suggestion .ai-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 12px;
+}
+
+.ai-suggestion .ai-explanation {
+    font-size: 13px;
+    margin-bottom: 16px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+}
+
+.ai-suggestion .code-diff {
+    margin: 16px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.ai-suggestion .code-block {
+    background: var(--surface-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.ai-suggestion .code-block .label {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.ai-suggestion .code-block.before .label {
+    color: #ef4444;
+}
+
+.ai-suggestion .code-block.after .label {
+    color: #10b981;
+}
+
+.ai-suggestion .code-block pre {
+    margin: 0;
+    padding: 0;
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--text-primary);
+}
+
+.ai-suggestion .ai-reasoning {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 12px;
+    font-style: italic;
+}
+
+.ai-suggestion .confidence-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 700;
+    margin-left: 8px;
+    text-transform: uppercase;
+}
+
+.ai-suggestion .confidence-badge.high {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.ai-suggestion .confidence-badge.medium {
+    background: rgba(245, 158, 11, 0.2);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.ai-suggestion .confidence-badge.low {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}

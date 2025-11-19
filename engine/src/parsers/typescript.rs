@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use regex::Regex;
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
@@ -320,6 +321,82 @@ pub fn calculate_package_size(package_path: &Path) -> Result<u64> {
     }
 
     Ok(total_size / 1024) // Return KB
+}
+
+/// Track usage of imported items throughout a file
+pub fn track_item_usage<P: AsRef<Path>>(
+    file_path: P,
+    imported_items: &[String],
+) -> Result<HashMap<String, (usize, Vec<usize>)>> {
+    let content = fs::read_to_string(&file_path)
+        .with_context(|| format!("Failed to read file: {}", file_path.as_ref().display()))?;
+
+    let mut usage_map: HashMap<String, (usize, Vec<usize>)> = HashMap::new();
+
+    // Initialize map for all imported items
+    for item in imported_items {
+        // Clean up item name (remove aliases like "as X")
+        let clean_item = if item.contains(" as ") {
+            item.split(" as ").last().unwrap_or(item).trim()
+        } else {
+            item.trim()
+        };
+
+        // Skip side-effect imports and namespace imports
+        if clean_item == "(side-effect)" || clean_item.starts_with("* as ") {
+            continue;
+        }
+
+        usage_map.insert(clean_item.to_string(), (0, Vec::new()));
+    }
+
+    // Search for usage in file content
+    for (line_num, line) in content.lines().enumerate() {
+        let line_number = line_num + 1;
+
+        // Skip import lines and comments
+        let trimmed = line.trim();
+        if trimmed.starts_with("import ")
+            || trimmed.starts_with("//")
+            || trimmed.starts_with("/*")
+            || trimmed.starts_with("*")
+        {
+            continue;
+        }
+
+        // Check for each imported item usage
+        for (item, (count, lines)) in usage_map.iter_mut() {
+            // Create patterns to match usage
+            // Pattern 1: Component usage in JSX: <Component or </Component>
+            // Pattern 2: Function call: Component( or Component.
+            // Pattern 3: As identifier: const x = Component
+            let patterns = vec![
+                format!(r"<{}", regex::escape(item)),
+                format!(r"</{}", regex::escape(item)),
+                format!(r"\b{}\(", regex::escape(item)),
+                format!(r"\b{}\.", regex::escape(item)),
+                format!(r"= {}\b", regex::escape(item)),
+                format!(r"{{ {} }}", regex::escape(item)),
+                format!(r"\b{} =", regex::escape(item)),
+                format!(r"extends {}\b", regex::escape(item)),
+                format!(r": {}\b", regex::escape(item)),
+            ];
+
+            for pattern in patterns {
+                if let Ok(re) = Regex::new(&pattern) {
+                    if re.is_match(line) {
+                        *count += 1;
+                        if !lines.contains(&line_number) {
+                            lines.push(line_number);
+                        }
+                        break; // Count once per line
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(usage_map)
 }
 
 #[cfg(test)]

@@ -121,11 +121,13 @@ export class ImportCommand {
             `• ${external} external packages\n` +
             `• ${large} exceed ${threshold} KB threshold`;
 
-          vscode.window.showInformationMessage(message, "View Details").then((selection) => {
-            if (selection === "View Details") {
-              vscode.commands.executeCommand("go5StyleGuardian.openPanel");
-            }
-          });
+          vscode.window
+            .showInformationMessage(message, "View Details")
+            .then((selection) => {
+              if (selection === "View Details") {
+                vscode.commands.executeCommand("go5StyleGuardian.openPanel");
+              }
+            });
         } catch (error) {
           vscode.window.showErrorMessage(
             `Failed to analyze imports: ${error instanceof Error ? error.message : String(error)}`,
@@ -247,7 +249,7 @@ export class ImportCommand {
     </style>
 </head>
 <body>
-    <h1>📦 Import Analysis</h1>
+    <h1>Import Analysis</h1>
 
     <div class="size">${this.escapeHtml(sizeText)}</div>
 
@@ -266,12 +268,16 @@ export class ImportCommand {
         <span class="value">${imp.line}</span>
     </div>
 
-    ${imp.resolvedPath ? `
+    ${
+      imp.resolvedPath
+        ? `
     <div class="detail-row">
         <span class="label">Resolved Path:</span>
         <span class="value"><code>${this.escapeHtml(imp.resolvedPath)}</code></span>
     </div>
-    ` : ""}
+    `
+        : ""
+    }
 
     <div class="detail-row">
         <span class="label">Imported Items:</span>
@@ -280,9 +286,13 @@ export class ImportCommand {
         </div>
     </div>
 
-    ${imp.message ? `
+    ${
+      imp.message
+        ? `
     <div class="message">${this.escapeHtml(imp.message)}</div>
-    ` : ""}
+    `
+        : ""
+    }
 
     <div class="detail-row">
         <span class="label">Severity:</span>

@@ -193,7 +193,7 @@ EXIT_CODE=$?
 
 if [ $EXIT_CODE -ne 0 ]; then
     echo ""
-    echo "❌ Commit blocked by Go5 Style Guardian"
+    echo "X Commit blocked by Go5 Style Guardian"
     echo ""
     echo "To fix: Open VSCode and resolve the critical issues"
     echo "To bypass: Use 'git commit --no-verify' (not recommended)"

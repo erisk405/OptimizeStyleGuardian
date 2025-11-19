@@ -6,16 +6,23 @@ import { ApiKeyManager } from "./config/apiKeyManager";
 import { GitHookManager } from "./gitHooks/hookManager";
 import { ImportDecorator } from "./decorations/importDecorator";
 import { RustBridge } from "./rustBridge";
+import { ComponentRegistry } from "./services/componentRegistry";
 
 let statusBarItem: vscode.StatusBarItem;
 let importStatusBarItem: vscode.StatusBarItem;
 let importDecorator: ImportDecorator;
+let componentRegistry: ComponentRegistry;
 
 export function activate(context: vscode.ExtensionContext) {
   console.log("Go5 Style Guardian is now active!");
 
   const apiKeyManager = new ApiKeyManager(context);
-  const panelManager = new PanelManager(context);
+  componentRegistry = new ComponentRegistry(context.workspaceState);
+  const panelManager = new PanelManager(
+    context,
+    apiKeyManager,
+    componentRegistry,
+  );
   const rustBridge = new RustBridge(context);
   const scanCommand = new ScanCommand(context, panelManager, apiKeyManager);
   const hookManager = new GitHookManager(context);
@@ -98,7 +105,7 @@ export function activate(context: vscode.ExtensionContext) {
         const installed = await hookManager.installHook(workspaceRoot);
         if (installed) {
           vscode.window.showInformationMessage(
-            "✅ Git pre-commit hook installed! Your commits will now be validated.",
+            "Git pre-commit hook installed! Your commits will now be validated.",
           );
           updateHookStatus(hookManager);
         }
@@ -142,6 +149,58 @@ export function activate(context: vscode.ExtensionContext) {
     ),
   );
 
+  // Component Registry commands
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "go5StyleGuardian.buildComponentRegistry",
+      async () => {
+        const workspaceRoot = getWorkspaceRoot();
+        if (!workspaceRoot) {
+          return;
+        }
+
+        const registry = await componentRegistry.buildRegistry(
+          workspaceRoot,
+          true,
+        );
+        vscode.window.showInformationMessage(
+          `Component Registry built: ${registry.components.length} components found in ${registry.totalFiles} files`,
+        );
+
+        // Start auto-rebuild watcher
+        componentRegistry.startWatching(workspaceRoot);
+      },
+    ),
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "go5StyleGuardian.clearComponentRegistry",
+      async () => {
+        await componentRegistry.invalidateCache();
+        vscode.window.showInformationMessage(
+          "Component Registry cache cleared",
+        );
+      },
+    ),
+  );
+
+  // Initialize Component Registry auto-rebuild
+  const workspaceRoot = getWorkspaceRoot();
+  if (workspaceRoot) {
+    // Build initial registry
+    componentRegistry
+      .buildRegistry(workspaceRoot)
+      .then(() => {
+        // Start watching for changes
+        componentRegistry.startWatching(workspaceRoot);
+        console.log("Component Registry auto-rebuild enabled");
+      })
+      .catch((error) => {
+        console.error("Failed to initialize Component Registry:", error);
+      });
+  }
+
   // Prompt to install git hook if not installed
   checkAndPromptGitHook(context, hookManager);
 
@@ -163,6 +222,11 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 export function deactivate() {
+  // Clean up Component Registry watcher
+  if (componentRegistry) {
+    componentRegistry.dispose();
+  }
+
   console.log("Go5 Style Guardian deactivated");
 }
 
@@ -258,9 +322,7 @@ async function checkAndPromptGitHook(
 
   if (autoInstall) {
     await hookManager.installHook(workspaceRoot);
-    vscode.window.showInformationMessage(
-      "✅ Git pre-commit hook auto-installed!",
-    );
+    vscode.window.showInformationMessage("Git pre-commit hook auto-installed!");
     updateHookStatus(hookManager);
     context.globalState.update("go5.hasPromptedGitHook", true);
     return;
@@ -277,7 +339,7 @@ async function checkAndPromptGitHook(
     const installed = await hookManager.installHook(workspaceRoot);
     if (installed) {
       vscode.window.showInformationMessage(
-        "✅ Git pre-commit hook installed! Use --no-verify to bypass if needed.",
+        "Git pre-commit hook installed! Use --no-verify to bypass if needed.",
       );
       updateHookStatus(hookManager);
     }

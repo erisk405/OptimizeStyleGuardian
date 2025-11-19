@@ -1,9 +1,10 @@
 use crate::parsers::typescript::{
-    calculate_import_size, parse_typescript_imports, ImportStatement,
+    calculate_import_size, parse_typescript_imports, track_item_usage, ImportStatement,
 };
-use crate::types::ImportAnalysisIssue;
+use crate::types::{ImportAnalysisIssue, ItemUsage};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::Path;
 
 #[derive(Debug, Clone)]
@@ -41,6 +42,21 @@ pub fn analyze_file_imports<P: AsRef<Path>>(
             );
         }
 
+        // Track usage of imported items
+        let item_usage = match track_item_usage(path_ref, &import.imported_items) {
+            Ok(usage_map) => {
+                let mut usage_hash: HashMap<String, ItemUsage> = HashMap::new();
+                for (item, (count, lines)) in usage_map {
+                    usage_hash.insert(item, ItemUsage { count, lines });
+                }
+                Some(usage_hash)
+            }
+            Err(e) => {
+                eprintln!("Warning: Failed to track item usage: {}", e);
+                None
+            }
+        };
+
         // Create issue based on analysis
         let (severity, message) = determine_issue(&import, config);
 
@@ -53,6 +69,7 @@ pub fn analyze_file_imports<P: AsRef<Path>>(
             resolved_path: import.resolved_path.clone(),
             severity,
             message,
+            item_usage,
         });
     }
 

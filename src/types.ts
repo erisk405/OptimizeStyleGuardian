@@ -75,6 +75,12 @@ export interface ImportAnalysisIssue {
   severity: "error" | "warning" | "info";
   message: string;
   aiSuggestion?: ImportOptimizationSuggestion;
+  itemUsage?: {
+    [itemName: string]: {
+      count: number;
+      lines: number[];
+    };
+  };
 }
 
 export interface ImportOptimizationSuggestion {

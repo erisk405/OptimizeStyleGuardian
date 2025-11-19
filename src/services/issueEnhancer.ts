@@ -1,6 +1,8 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import { AnthropicService } from "./anthropicService";
+import { ComponentRegistry } from "./componentRegistry";
+import { ConversationManager } from "./conversationManager";
 import {
   AnalysisResult,
   DuplicateStyleIssue,
@@ -18,10 +20,13 @@ import {
 } from "../types/enhanced";
 
 export class IssueEnhancer {
+  private conversationManager = new ConversationManager();
+
   constructor(
     private anthropicService: AnthropicService,
     private maxIssues: number = 10,
     private contextLines: number = 5,
+    private componentRegistry?: ComponentRegistry,
   ) {}
 
   /**
@@ -199,10 +204,13 @@ export class IssueEnhancer {
       const fileContent = await this.readFileContent(issue.file);
       if (!fileContent) return null;
 
-      const context = this.extractContext(fileContent, issue.line);
-
-      const prompt = this.generateImportOptimizationPrompt(issue, context);
-      const systemPrompt = this.getImportOptimizationSystemPrompt();
+      const prompt = await this.generateImportOptimizationPrompt(
+        issue,
+        fileContent,
+        workspaceRoot,
+      );
+      const systemPrompt =
+        await this.getImportOptimizationSystemPrompt(workspaceRoot);
 
       const aiResponse = await this.anthropicService.analyzeSuggestion(
         prompt,
@@ -211,7 +219,7 @@ export class IssueEnhancer {
 
       if (!aiResponse) return null;
 
-      return {
+      const suggestion: ImportOptimizationSuggestion = {
         explanation: aiResponse.explanation,
         codeChange: {
           original: aiResponse.original_code,
@@ -225,10 +233,90 @@ export class IssueEnhancer {
         potentialSavings: this.extractPotentialSavings(aiResponse),
         alternativePackage: aiResponse.alternative_package,
       };
+
+      // Start conversation for this issue
+      this.conversationManager.startConversation(issue, suggestion);
+
+      return suggestion;
     } catch (error) {
       console.error("Error enhancing import:", error);
       return null;
     }
+  }
+
+  /**
+   * Handle follow-up question in conversation
+   */
+  async askFollowUp(
+    issue: ImportAnalysisIssue,
+    question: string,
+    workspaceRoot: string,
+  ): Promise<string | null> {
+    try {
+      // Check if conversation exists
+      if (!this.conversationManager.hasConversation(issue)) {
+        return "No active conversation. Please request an AI suggestion first.";
+      }
+
+      // Add user question to conversation
+      this.conversationManager.addUserMessage(issue, question);
+
+      // Get conversation history
+      const history = this.conversationManager.getConversationHistory(issue);
+
+      // Get file content for context
+      const fileContent = await this.readFileContent(issue.file);
+      if (!fileContent) return null;
+
+      // Build prompt with conversation history
+      const prompt = `Previous conversation about import optimization:
+
+${history}
+
+User's follow-up question: ${question}
+
+File: ${issue.file}
+Import: ${issue.source}
+Imported Items: ${issue.importedItems.join(", ")}
+
+Full File Content:
+\`\`\`typescript
+${fileContent}
+\`\`\`
+
+Please answer the user's follow-up question based on the context of our previous conversation.
+Keep your answer concise and actionable.`;
+
+      const systemPrompt =
+        await this.getImportOptimizationSystemPrompt(workspaceRoot);
+
+      // Get AI response (plain text response for follow-up)
+      const response = await this.anthropicService.chat(prompt, systemPrompt);
+
+      if (response) {
+        // Add assistant response to conversation
+        this.conversationManager.addAssistantMessage(issue, response);
+      }
+
+      return response;
+    } catch (error) {
+      console.error("Error handling follow-up question:", error);
+      return null;
+    }
+  }
+
+  /**
+   * Get conversation history for an issue
+   */
+  getConversation(issue: ImportAnalysisIssue) {
+    return this.conversationManager.getConversation(issue);
+  }
+
+  /**
+   * Clear conversation for an issue
+   */
+  clearConversation(issue: ImportAnalysisIssue): void {
+    this.conversationManager.clearConversation(issue);
   }
 
   /**
@@ -347,13 +435,28 @@ Expected line numbers: start_line=${issue.line || 1}, end_line=${issue.line || 1
   /**
    * Generate prompt for import optimization
    */
-  private generateImportOptimizationPrompt(
+  private async generateImportOptimizationPrompt(
     issue: ImportAnalysisIssue,
-    context: string,
-  ): string {
+    fileContent: string,
+    workspaceRoot: string,
+  ): Promise<string> {
     const sizeInfo = issue.sizeKb
       ? `${issue.sizeKb} KB`
       : "Unknown (external package)";
+
+    // Build usage information
+    let usageInfo = "";
+    if (issue.itemUsage) {
+      usageInfo = "\n\nImported Items Usage Analysis:";
+      for (const [item, usage] of Object.entries(issue.itemUsage)) {
+        const itemUsage = usage as { count: number; lines: number[] };
+        if (itemUsage.count === 0) {
+          usageInfo += `\n  - ${item}: UNUSED (can be safely removed!)`;
+        } else {
+          usageInfo += `\n  + ${item}: Used ${itemUsage.count} time(s) at line(s) ${itemUsage.lines.join(", ")}`;
+        }
+      }
+    }
 
     return `Analyze this import statement and suggest optimizations to reduce bundle size:
 
@@ -362,11 +465,11 @@ Import Line: ${issue.line}
 Source: ${issue.source}
 Imported Items: ${issue.importedItems.join(", ")}
 Current Size: ${sizeInfo}
-${issue.resolvedPath ? `Resolved Path: ${issue.resolvedPath}` : ""}
+${issue.resolvedPath ? `Resolved Path: ${issue.resolvedPath}` : ""}${usageInfo}
 
-Code Context:
+Full File Content:
 \`\`\`typescript
-${context}
+${fileContent}
 \`\`\`
 
 Task: Provide specific suggestions to reduce the bundle size impact of this import. Consider:
@@ -393,7 +496,22 @@ Be practical and ensure the suggested code actually works and maintains function
   /**
    * Get system prompt for import optimization
    */
-  private getImportOptimizationSystemPrompt(): string {
+  private async getImportOptimizationSystemPrompt(
+    workspaceRoot: string,
+  ): Promise<string> {
+    let projectContext = "";
+
+    // Get project components from registry
+    if (this.componentRegistry) {
+      try {
+        const summary =
+          await this.componentRegistry.getProjectSummary(workspaceRoot);
+        projectContext = `\n\nProject Context:\n${summary}\n\nWhen suggesting optimizations, consider these available components in the project.`;
+      } catch (error) {
+        console.error("Failed to get project context:", error);
+      }
+    }
+
     return `You are a bundle optimization expert specializing in JavaScript/TypeScript imports.
 Your goal is to reduce bundle sizes through:
 - More specific imports (tree-shaking)
@@ -410,12 +528,14 @@ Guidelines:
 - For React, suggest proper lazy loading with Suspense
 - For utilities, prefer granular imports (e.g., lodash-es over lodash)
 - Recommend proven lighter alternatives (e.g., dayjs over moment)
+- When imports are UNUSED, prioritize removing them
+- Consider if the project already has similar components available
 
 Common patterns:
 - \`import { specific } from 'package'\` over \`import * as pkg from 'package'\`
 - \`const Component = lazy(() => import('./Heavy'))\` for large components
 - \`import('package').then()\` for conditional/deferred loading
-- \`date-fns\` over \`moment\`, \`preact\` over \`react\` for small apps
+- \`date-fns\` over \`moment\`, \`dayjs\` over \`moment\`${projectContext}
 
 Always respond with valid JSON matching the specified format.`;
   }

@@ -205,6 +205,18 @@
           "type": "boolean",
           "default": true,
           "description": "Show warnings during commit (won't block commit)"
+        },
+        "go5StyleGuardian.componentRegistry.autoRebuild": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically rebuild Component Registry when files change"
+        },
+        "go5StyleGuardian.componentRegistry.rebuildDelay": {
+          "type": "number",
+          "default": 2000,
+          "minimum": 500,
+          "maximum": 10000,
+          "description": "Delay in milliseconds before rebuilding Component Registry after file changes"
         }
       }
     }
