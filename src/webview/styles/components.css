@@ -113,8 +113,8 @@
 /* Modern Grid Layout for Issue Cards */
 .issue-list {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: var(--spacing-md);
+    grid-template-columns: repeat(auto-fill, minmax(500px, 1fr));
+    gap: var(--spacing-xl);
     align-items: start;
 }
 
@@ -127,25 +127,26 @@
 
 @media (min-width: 769px) and (max-width: 1200px) {
     .issue-list {
-        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));
     }
 }
 
 @media (min-width: 1201px) {
     .issue-list {
-        grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(550px, 1fr));
     }
 }
 
-/* Compact Modern Cards */
+/* Compact Modern Cards - Next.js Style */
 .issue-card {
     background: var(--card-bg);
-    padding: var(--spacing-sm);
-    border-radius: var(--border-radius-md);
+    padding: var(--spacing-md);
+    border-radius: 12px;
     border: 1px solid var(--card-border);
-    border-left: 3px solid var(--card-border);
     transition: all var(--transition-normal);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+    box-shadow:
+        0 1px 3px rgba(0, 0, 0, 0.05),
+        0 1px 2px rgba(0, 0, 0, 0.02);
     position: relative;
     overflow: hidden;
     min-height: 120px;
@@ -156,20 +157,22 @@
 
 .issue-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    box-shadow:
+        0 4px 6px rgba(0, 0, 0, 0.07),
+        0 2px 4px rgba(0, 0, 0, 0.05);
     border-color: var(--card-hover-border);
 }
 
 .issue-card.critical {
-    border-left-color: #ef4444;
+    /* Removed border-left-color */
 }
 
 .issue-card.warning {
-    border-left-color: #f59e0b;
+    /* Removed border-left-color */
 }
 
 .issue-card.info {
-    border-left-color: #6366f1;
+    /* Removed border-left-color */
 }
 
 .issue-card.expanded {
@@ -227,9 +230,10 @@
 
 .issue-actions {
     display: flex;
-    gap: var(--spacing-sm);
-    flex-wrap: wrap;
+    gap: var(--spacing-md);
+    flex-wrap: nowrap;
     margin-top: auto;
+    align-items: center;
 }
 
 /* Compact Badges */

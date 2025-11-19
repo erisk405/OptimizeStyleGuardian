@@ -509,99 +509,6 @@ export class PanelManager {
 
             const severityClass = severity === 'warning' ? 'warning' : severity === 'error' ? 'critical' : 'info';
 
-            let aiSuggestionHtml = '';
-            if (issue.aiSuggestion) {
-                const suggestion = issue.aiSuggestion;
-                const typeLabel = suggestion.optimizationType.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-                const savingsText = suggestion.potentialSavings
-                    ? \` (-\${suggestion.potentialSavings}KB)\`
-                    : '';
-
-                // Create references section if available
-                const referencesHtml = suggestion.references ? \`
-                    <div class="ai-references">
-                        <div class="ai-references-title">References</div>
-                        <ul class="ai-reference-list">
-                            \${suggestion.references.map(ref => \`
-                                <li class="ai-reference-item">
-                                    \${ref.url ?
-                                        \`<a href="\${escapeHtml(ref.url)}" class="ai-reference-link">\${escapeHtml(ref.title)}</a>\` :
-                                        escapeHtml(ref.title)
-                                    }
-                                </li>
-                            \`).join('')}
-                        </ul>
-                    </div>
-                \` : '';
-
-                // Create confidence indicator
-                const confidenceIndicator = \`
-                    <div class="ai-confidence-indicator \${suggestion.confidence}">
-                        <span class="ai-confidence-dot"></span>
-                        <span class="ai-confidence-dot"></span>
-                        <span class="ai-confidence-dot"></span>
-                    </div>
-                \`;
-
-                aiSuggestionHtml = \`
-                    <button class="ai-toggle" onclick="toggleAiPanel(\${index})" id="ai-toggle-\${index}">
-                        <span class="ai-toggle-icon"></span>
-                        AI: \${typeLabel}\${savingsText}
-                        \${confidenceIndicator}
-                    </button>
-                    <div class="ai-suggestion-panel collapsed" id="ai-panel-\${index}">
-                        <div class="ai-suggestion-header collapsed" onclick="toggleAiPanel(\${index})">
-                            <span class="ai-badge">AI Optimization</span>
-                            <span class="ai-preview">\${escapeHtml(suggestion.explanation.substring(0, 60))}...</span>
-                        </div>
-                        <div class="ai-suggestion-content" style="display: none;" id="ai-content-\${index}">
-                            <div class="ai-explanation">\${escapeHtml(suggestion.explanation)}</div>
-
-                            <div class="ai-code-diff">
-                                <div class="ai-code-tabs">
-                                    <button class="ai-code-tab active" onclick="showCodeTab(\${index}, 'original')">Current Code</button>
-                                    <button class="ai-code-tab" onclick="showCodeTab(\${index}, 'suggested')">Suggested Code</button>
-                                </div>
-                                <div class="ai-code-content">
-                                    <button class="ai-copy-btn" onclick="copyCode(\${index}, 'suggested')">Copy</button>
-                                    <pre class="ai-code-block original" id="code-original-\${index}"><code>\${escapeHtml(suggestion.codeChange.original)}</code></pre>
-                                    <pre class="ai-code-block suggested" id="code-suggested-\${index}" style="display: none;"><code>\${escapeHtml(suggestion.codeChange.suggested)}</code></pre>
-                                </div>
-                            </div>
-
-                            <div class="ai-reasoning">
-                                <div class="ai-reasoning-title">Reasoning</div>
-                                \${escapeHtml(suggestion.reasoning)}
-                            </div>
-
-                            \${referencesHtml}
-
-                            \${suggestion.alternativePackage ? \`
-                                <div class="ai-alternatives">
-                                    <div class="ai-alternatives-title">Alternative Package</div>
-                                    <div class="ai-alternative-item">
-                                        <span class="ai-alternative-package">\${escapeHtml(suggestion.alternativePackage)}</span>
-                                        - Consider using this lighter alternative
-                                    </div>
-                                </div>
-                            \` : ''}
-
-                            <div class="ai-actions">
-                                <button class="btn btn-primary" onclick="applyImportSuggestion(\${index})">Apply Changes</button>
-                                <button class="btn btn-secondary" onclick="dismissSuggestion(\${index})">Dismiss</button>
-                            </div>
-                        </div>
-                    </div>
-                \`;
-            } else {
-                // Show button to request AI suggestion
-                aiSuggestionHtml = \`
-                    <button class="btn btn-ai" onclick="requestImportSuggestion(\${index})" id="suggest-btn-\${index}">
-                        Get AI Suggestion
-                    </button>
-                \`;
-            }
-
             return \`
                 <div class="issue-card \${severityClass}" data-import-index="\${index}">
                     <div class="issue-header">
@@ -612,8 +519,72 @@ export class PanelManager {
                     <div class="issue-location">\${escapeHtml(file)}:\${line}</div>
                     <div class="issue-actions">
                         <button class="btn btn-secondary" onclick="goToCode('\${escapeJsString(file)}', \${line})">Go to Code</button>
+                        \${issue.aiSuggestion ? \`
+                            <button class="ai-toggle" onclick="toggleAiPanel(\${index})" id="ai-toggle-\${index}">
+                                <span class="ai-toggle-icon"></span>
+                                AI: \${issue.aiSuggestion.optimizationType.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}\${issue.aiSuggestion.potentialSavings ? \` (-\${issue.aiSuggestion.potentialSavings}KB)\` : ''}
+                            </button>
+                        \` : \`
+                            <button class="btn btn-ai" onclick="requestImportSuggestion(\${index})" id="suggest-btn-\${index}">
+                                Get AI Suggestion
+                            </button>
+                        \`}
                     </div>
-                    \${aiSuggestionHtml}
+                    \${issue.aiSuggestion ? \`
+                        <div class="ai-suggestion-panel collapsed" id="ai-panel-\${index}">
+                            <div class="ai-suggestion-content" style="display: none;" id="ai-content-\${index}">
+                                <div class="ai-explanation">\${escapeHtml(issue.aiSuggestion.explanation)}</div>
+
+                                <div class="ai-code-diff">
+                                    <div class="ai-code-tabs">
+                                        <button class="ai-code-tab active" onclick="showCodeTab(\${index}, 'original')">Current Code</button>
+                                        <button class="ai-code-tab" onclick="showCodeTab(\${index}, 'suggested')">Suggested Code</button>
+                                    </div>
+                                    <div class="ai-code-content">
+                                        <button class="ai-copy-btn" onclick="copyCode(\${index}, 'suggested')">Copy</button>
+                                        <pre class="ai-code-block original" id="code-original-\${index}"><code>\${escapeHtml(issue.aiSuggestion.codeChange.original)}</code></pre>
+                                        <pre class="ai-code-block suggested" id="code-suggested-\${index}" style="display: none;"><code>\${escapeHtml(issue.aiSuggestion.codeChange.suggested)}</code></pre>
+                                    </div>
+                                </div>
+
+                                <div class="ai-reasoning">
+                                    <div class="ai-reasoning-title">Reasoning</div>
+                                    \${escapeHtml(issue.aiSuggestion.reasoning)}
+                                </div>
+
+                                \${issue.aiSuggestion.references ? \`
+                                    <div class="ai-references">
+                                        <div class="ai-references-title">References</div>
+                                        <ul class="ai-reference-list">
+                                            \${issue.aiSuggestion.references.map(ref => \`
+                                                <li class="ai-reference-item">
+                                                    \${ref.url ?
+                                                        \`<a href="\${escapeHtml(ref.url)}" class="ai-reference-link">\${escapeHtml(ref.title)}</a>\` :
+                                                        escapeHtml(ref.title)
+                                                    }
+                                                </li>
+                                            \`).join('')}
+                                        </ul>
+                                    </div>
+                                \` : ''}
+
+                                \${issue.aiSuggestion.alternativePackage ? \`
+                                    <div class="ai-alternatives">
+                                        <div class="ai-alternatives-title">Alternative Package</div>
+                                        <div class="ai-alternative-item">
+                                            <span class="ai-alternative-package">\${escapeHtml(issue.aiSuggestion.alternativePackage)}</span>
+                                            - Consider using this lighter alternative
+                                        </div>
+                                    </div>
+                                \` : ''}
+
+                                <div class="ai-actions">
+                                    <button class="btn btn-primary" onclick="applyImportSuggestion(\${index})">Apply Changes</button>
+                                    <button class="btn btn-secondary" onclick="dismissSuggestion(\${index})">Dismiss</button>
+                                </div>
+                            </div>
+                        </div>
+                    \` : ''}
                 </div>
             \`;
         }
@@ -789,21 +760,18 @@ export class PanelManager {
             const panel = document.getElementById(\`ai-panel-\${index}\`);
             const toggle = document.getElementById(\`ai-toggle-\${index}\`);
             const content = document.getElementById(\`ai-content-\${index}\`);
-            const header = panel.querySelector('.ai-suggestion-header');
 
             if (panel.classList.contains('collapsed')) {
                 // Expand
                 panel.classList.remove('collapsed');
                 panel.classList.add('expanded');
                 toggle.classList.add('expanded');
-                header.classList.remove('collapsed');
                 content.style.display = 'block';
             } else {
                 // Collapse
                 panel.classList.add('collapsed');
                 panel.classList.remove('expanded');
                 toggle.classList.remove('expanded');
-                header.classList.add('collapsed');
                 content.style.display = 'none';
             }
         }
