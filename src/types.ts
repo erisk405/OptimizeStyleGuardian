@@ -101,6 +101,11 @@ export interface ImportOptimizationSuggestion {
     | "remove-unused";
   potentialSavings?: number; // KB saved
   alternativePackage?: string;
+  references?: Array<{
+    title: string;
+    url?: string;
+    description?: string;
+  }>;
 }
 
 export interface AnalysisSummary {

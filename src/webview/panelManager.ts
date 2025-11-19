@@ -512,44 +512,93 @@ export class PanelManager {
             let aiSuggestionHtml = '';
             if (issue.aiSuggestion) {
                 const suggestion = issue.aiSuggestion;
-                const typeLabel = suggestion.optimizationType.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                const typeLabel = suggestion.optimizationType.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
                 const savingsText = suggestion.potentialSavings
-                    ? \` (Save ~\${suggestion.potentialSavings} KB)\`
+                    ? \` (-\${suggestion.potentialSavings}KB)\`
                     : '';
 
+                // Create references section if available
+                const referencesHtml = suggestion.references ? \`
+                    <div class="ai-references">
+                        <div class="ai-references-title">References</div>
+                        <ul class="ai-reference-list">
+                            \${suggestion.references.map(ref => \`
+                                <li class="ai-reference-item">
+                                    \${ref.url ?
+                                        \`<a href="\${escapeHtml(ref.url)}" class="ai-reference-link">\${escapeHtml(ref.title)}</a>\` :
+                                        escapeHtml(ref.title)
+                                    }
+                                </li>
+                            \`).join('')}
+                        </ul>
+                    </div>
+                \` : '';
+
+                // Create confidence indicator
+                const confidenceIndicator = \`
+                    <div class="ai-confidence-indicator \${suggestion.confidence}">
+                        <span class="ai-confidence-dot"></span>
+                        <span class="ai-confidence-dot"></span>
+                        <span class="ai-confidence-dot"></span>
+                    </div>
+                \`;
+
                 aiSuggestionHtml = \`
-                    <div class="ai-suggestion-panel">
-                        <div class="ai-suggestion-header">
-                            <span class="ai-badge">AI Suggestion: \${typeLabel}\${savingsText}</span>
-                            <span class="confidence-badge confidence-\${suggestion.confidence}">\${suggestion.confidence} confidence</span>
+                    <button class="ai-toggle" onclick="toggleAiPanel(\${index})" id="ai-toggle-\${index}">
+                        <span class="ai-toggle-icon"></span>
+                        AI: \${typeLabel}\${savingsText}
+                        \${confidenceIndicator}
+                    </button>
+                    <div class="ai-suggestion-panel collapsed" id="ai-panel-\${index}">
+                        <div class="ai-suggestion-header collapsed" onclick="toggleAiPanel(\${index})">
+                            <span class="ai-badge">AI Optimization</span>
+                            <span class="ai-preview">\${escapeHtml(suggestion.explanation.substring(0, 60))}...</span>
                         </div>
-                        <div class="ai-explanation">\${escapeHtml(suggestion.explanation)}</div>
-                        <div class="code-diff">
-                            <div class="code-section">
-                                <div class="code-label">Current:</div>
-                                <pre class="code-block code-original"><code>\${escapeHtml(suggestion.codeChange.original)}</code></pre>
+                        <div class="ai-suggestion-content" style="display: none;" id="ai-content-\${index}">
+                            <div class="ai-explanation">\${escapeHtml(suggestion.explanation)}</div>
+
+                            <div class="ai-code-diff">
+                                <div class="ai-code-tabs">
+                                    <button class="ai-code-tab active" onclick="showCodeTab(\${index}, 'original')">Current Code</button>
+                                    <button class="ai-code-tab" onclick="showCodeTab(\${index}, 'suggested')">Suggested Code</button>
+                                </div>
+                                <div class="ai-code-content">
+                                    <button class="ai-copy-btn" onclick="copyCode(\${index}, 'suggested')">Copy</button>
+                                    <pre class="ai-code-block original" id="code-original-\${index}"><code>\${escapeHtml(suggestion.codeChange.original)}</code></pre>
+                                    <pre class="ai-code-block suggested" id="code-suggested-\${index}" style="display: none;"><code>\${escapeHtml(suggestion.codeChange.suggested)}</code></pre>
+                                </div>
                             </div>
-                            <div class="code-section">
-                                <div class="code-label">Suggested:</div>
-                                <pre class="code-block code-suggested"><code>\${escapeHtml(suggestion.codeChange.suggested)}</code></pre>
+
+                            <div class="ai-reasoning">
+                                <div class="ai-reasoning-title">Reasoning</div>
+                                \${escapeHtml(suggestion.reasoning)}
                             </div>
-                        </div>
-                        <div class="ai-reasoning"><strong>Why:</strong> \${escapeHtml(suggestion.reasoning)}</div>
-                        \${suggestion.alternativePackage ? \`<div class="alternative-package">Alternative: <code>\${escapeHtml(suggestion.alternativePackage)}</code></div>\` : ''}
-                        <div class="ai-actions">
-                            <button class="btn btn-primary" onclick="applyImportSuggestion(\${index})">Apply Suggestion</button>
-                            <button class="btn" onclick="dismissSuggestion(\${index})">Dismiss</button>
+
+                            \${referencesHtml}
+
+                            \${suggestion.alternativePackage ? \`
+                                <div class="ai-alternatives">
+                                    <div class="ai-alternatives-title">Alternative Package</div>
+                                    <div class="ai-alternative-item">
+                                        <span class="ai-alternative-package">\${escapeHtml(suggestion.alternativePackage)}</span>
+                                        - Consider using this lighter alternative
+                                    </div>
+                                </div>
+                            \` : ''}
+
+                            <div class="ai-actions">
+                                <button class="btn btn-primary" onclick="applyImportSuggestion(\${index})">Apply Changes</button>
+                                <button class="btn btn-secondary" onclick="dismissSuggestion(\${index})">Dismiss</button>
+                            </div>
                         </div>
                     </div>
                 \`;
             } else {
                 // Show button to request AI suggestion
                 aiSuggestionHtml = \`
-                    <div class="ai-suggestion-request">
-                        <button class="btn btn-ai" onclick="requestImportSuggestion(\${index})" id="suggest-btn-\${index}">
-                            Get AI Optimization Suggestion
-                        </button>
-                    </div>
+                    <button class="btn btn-ai" onclick="requestImportSuggestion(\${index})" id="suggest-btn-\${index}">
+                        Get AI Suggestion
+                    </button>
                 \`;
             }
 
@@ -733,6 +782,68 @@ export class PanelManager {
                 line: line,
                 column: column || 0
             });
+        }
+
+        // Toggle AI Panel collapse/expand
+        function toggleAiPanel(index) {
+            const panel = document.getElementById(\`ai-panel-\${index}\`);
+            const toggle = document.getElementById(\`ai-toggle-\${index}\`);
+            const content = document.getElementById(\`ai-content-\${index}\`);
+            const header = panel.querySelector('.ai-suggestion-header');
+
+            if (panel.classList.contains('collapsed')) {
+                // Expand
+                panel.classList.remove('collapsed');
+                panel.classList.add('expanded');
+                toggle.classList.add('expanded');
+                header.classList.remove('collapsed');
+                content.style.display = 'block';
+            } else {
+                // Collapse
+                panel.classList.add('collapsed');
+                panel.classList.remove('expanded');
+                toggle.classList.remove('expanded');
+                header.classList.add('collapsed');
+                content.style.display = 'none';
+            }
+        }
+
+        // Show code tab (original/suggested)
+        function showCodeTab(index, type) {
+            const originalCode = document.getElementById(\`code-original-\${index}\`);
+            const suggestedCode = document.getElementById(\`code-suggested-\${index}\`);
+            const tabs = document.querySelectorAll(\`#ai-panel-\${index} .ai-code-tab\`);
+
+            tabs.forEach(tab => tab.classList.remove('active'));
+
+            if (type === 'original') {
+                originalCode.style.display = 'block';
+                suggestedCode.style.display = 'none';
+                tabs[0].classList.add('active');
+            } else {
+                originalCode.style.display = 'none';
+                suggestedCode.style.display = 'block';
+                tabs[1].classList.add('active');
+            }
+        }
+
+        // Copy code to clipboard
+        function copyCode(index, type) {
+            const codeElement = type === 'original'
+                ? document.getElementById(\`code-original-\${index}\`)
+                : document.getElementById(\`code-suggested-\${index}\`);
+
+            if (codeElement) {
+                const code = codeElement.textContent;
+                navigator.clipboard.writeText(code).then(() => {
+                    const copyBtn = codeElement.parentElement.querySelector('.ai-copy-btn');
+                    const originalText = copyBtn.textContent;
+                    copyBtn.textContent = 'Copied!';
+                    setTimeout(() => {
+                        copyBtn.textContent = originalText;
+                    }, 2000);
+                });
+            }
         }
 
         function attachEventListeners() {

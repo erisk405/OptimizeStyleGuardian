@@ -232,6 +232,7 @@ export class IssueEnhancer {
         optimizationType: this.parseOptimizationType(aiResponse),
         potentialSavings: this.extractPotentialSavings(aiResponse),
         alternativePackage: aiResponse.alternative_package,
+        references: this.generateReferences(issue, aiResponse),
       };
 
       // Start conversation for this issue
@@ -571,5 +572,80 @@ Always respond with valid JSON matching the specified format.`;
       return response.potential_savings;
     }
     return undefined;
+  }
+
+  private generateReferences(
+    issue: ImportAnalysisIssue,
+    response: any,
+  ): Array<{
+    title: string;
+    url?: string;
+    description?: string;
+  }> {
+    const references = [];
+
+    // Add package-specific references based on the import source
+    if (issue.source) {
+      const packageName = issue.source.split("/")[0];
+
+      // Add npm package reference
+      references.push({
+        title: `${packageName} on npm`,
+        url: `https://www.npmjs.com/package/${packageName}`,
+        description: "Official npm package page",
+      });
+
+      // Add bundlephobia reference for size analysis
+      references.push({
+        title: `${packageName} bundle size`,
+        url: `https://bundlephobia.com/package/${packageName}`,
+        description: "Bundle size and performance analysis",
+      });
+    }
+
+    // Add optimization-specific references
+    const optimizationType = this.parseOptimizationType(response);
+    switch (optimizationType) {
+      case "tree-shaking":
+        references.push({
+          title: "Tree Shaking Guide",
+          url: "https://webpack.js.org/guides/tree-shaking/",
+          description: "Learn about tree shaking optimization",
+        });
+        break;
+      case "code-splitting":
+        references.push({
+          title: "Code Splitting Documentation",
+          url: "https://webpack.js.org/guides/code-splitting/",
+          description: "Dynamic imports and code splitting",
+        });
+        break;
+      case "lazy-loading":
+        references.push({
+          title: "Lazy Loading Best Practices",
+          url: "https://web.dev/lazy-loading/",
+          description: "Performance optimization with lazy loading",
+        });
+        break;
+      case "lighter-alternative":
+        if (response.alternative_package) {
+          references.push({
+            title: `${response.alternative_package} on npm`,
+            url: `https://www.npmjs.com/package/${response.alternative_package}`,
+            description: "Suggested alternative package",
+          });
+        }
+        break;
+    }
+
+    // Add project-specific context if available
+    if (this.componentRegistry) {
+      references.push({
+        title: "Similar imports in project",
+        description: `Check other files for consistent import patterns`,
+      });
+    }
+
+    return references;
   }
 }
