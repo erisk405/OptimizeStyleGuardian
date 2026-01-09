@@ -1,3 +1,4 @@
+use crate::analyzers::import_analyzer;
 use crate::detectors;
 use crate::lighthouse_rules;
 use crate::parsers;
@@ -25,6 +26,7 @@ pub struct EnabledCategories {
     pub duplicate_styles: bool,
     pub design_system: bool,
     pub performance: bool,
+    pub import_analysis: bool,
 }
 
 pub struct Scanner {
@@ -41,6 +43,7 @@ impl Scanner {
         let mut duplicates = Vec::new();
         let mut design_system = Vec::new();
         let mut performance = Vec::new();
+        let mut imports = Vec::new();
 
         // Collect files to scan
         let files = self.collect_files()?;
@@ -119,13 +122,43 @@ impl Scanner {
             }
         }
 
+        // Analyze imports in TypeScript/JavaScript files
+        if self.options.enabled_categories.import_analysis && !js_files.is_empty() {
+            let config = import_analyzer::ImportAnalysisConfig {
+                size_threshold_kb: 100,
+                warn_large_imports: true,
+            };
+
+            for file in &js_files {
+                match import_analyzer::analyze_file_imports(file, &config) {
+                    Ok(mut issues) => {
+                        imports.append(&mut issues);
+                    }
+                    Err(e) => {
+                        eprintln!(
+                            "Warning: Failed to analyze imports in {}: {}",
+                            file.display(),
+                            e
+                        );
+                    }
+                }
+            }
+        }
+
         // Create summary
-        let summary = self.create_summary(files.len(), &duplicates, &design_system, &performance);
+        let summary = self.create_summary(
+            files.len(),
+            &duplicates,
+            &design_system,
+            &performance,
+            &imports,
+        );
 
         Ok(AnalysisResult {
             duplicates,
             design_system,
             performance,
+            imports,
             summary,
         })
     }
@@ -225,6 +258,7 @@ impl Scanner {
         duplicates: &[DuplicateStyleIssue],
         design_system: &[DesignSystemIssue],
         performance: &[PerformanceIssue],
+        imports: &[ImportAnalysisIssue],
     ) -> AnalysisSummary {
         let mut critical_count = 0;
         let mut warning_count = 0;
@@ -258,7 +292,17 @@ impl Scanner {
             }
         }
 
-        let total_issues = duplicates.len() + design_system.len() + performance.len();
+        for issue in imports {
+            match issue.severity.as_str() {
+                "error" => critical_count += 1,
+                "warning" => warning_count += 1,
+                "info" => info_count += 1,
+                _ => {}
+            }
+        }
+
+        let total_issues =
+            duplicates.len() + design_system.len() + performance.len() + imports.len();
 
         AnalysisSummary {
             total_files,
@@ -266,6 +310,7 @@ impl Scanner {
             duplicate_count: duplicates.len(),
             design_system_count: design_system.len(),
             performance_count: performance.len(),
+            import_count: imports.len(),
             critical_count,
             warning_count,
             info_count,

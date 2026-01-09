@@ -35,6 +35,26 @@
       {
         "command": "go5StyleGuardian.openPanel",
         "title": "Go5: Open Style Guardian Panel"
+      },
+      {
+        "command": "go5StyleGuardian.configureApiKey",
+        "title": "Go5: Configure Anthropic API Key"
+      },
+      {
+        "command": "go5StyleGuardian.installGitHook",
+        "title": "Go5: Install Git Pre-Commit Hook"
+      },
+      {
+        "command": "go5StyleGuardian.uninstallGitHook",
+        "title": "Go5: Uninstall Git Pre-Commit Hook"
+      },
+      {
+        "command": "go5StyleGuardian.checkImportSize",
+        "title": "Go5: Check Import Size at Cursor"
+      },
+      {
+        "command": "go5StyleGuardian.analyzeAllImports",
+        "title": "Go5: Analyze All Imports in File"
       }
     ],
     "menus": {
@@ -48,6 +68,18 @@
           "command": "go5StyleGuardian.scanCurrentFile",
           "when": "!explorerResourceIsFolder",
           "group": "go5guardian@1"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "go5StyleGuardian.checkImportSize",
+          "when": "editorTextFocus && resourceExtname =~ /\\.(ts|tsx|js|jsx)$/",
+          "group": "go5guardian@1"
+        },
+        {
+          "command": "go5StyleGuardian.analyzeAllImports",
+          "when": "editorTextFocus && resourceExtname =~ /\\.(ts|tsx|js|jsx)$/",
+          "group": "go5guardian@2"
         }
       ]
     },
@@ -76,6 +108,16 @@
           "default": 500,
           "description": "Image file size threshold in KB"
         },
+        "go5StyleGuardian.importSizeThreshold": {
+          "type": "number",
+          "default": 100,
+          "description": "Import file size threshold in KB (warns about large imports)"
+        },
+        "go5StyleGuardian.showInlineImportCost": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show import size inline next to import statements (similar to Import Cost extension)"
+        },
         "go5StyleGuardian.designSystemConfigPath": {
           "type": "string",
           "default": "config/design-system.yml",
@@ -86,7 +128,8 @@
           "default": {
             "duplicateStyles": true,
             "designSystem": true,
-            "performance": true
+            "performance": true,
+            "importAnalysis": true
           },
           "description": "Enable or disable specific analysis categories"
         },
@@ -113,6 +156,67 @@
             "**/.git/**"
           ],
           "description": "File patterns to exclude from scanning"
+        },
+        "go5StyleGuardian.enableAiSuggestions": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable AI-powered code suggestions using Anthropic Claude API"
+        },
+        "go5StyleGuardian.aiModel": {
+          "type": "string",
+          "default": "claude-sonnet-4-5-20250929",
+          "enum": [
+            "claude-sonnet-4-5-20250929",
+            "claude-haiku-4-5-20251001",
+            "claude-opus-4-1-20250805"
+          ],
+          "description": "Anthropic AI model to use for suggestions"
+        },
+        "go5StyleGuardian.aiMaxIssuesPerScan": {
+          "type": "number",
+          "default": 10,
+          "minimum": 1,
+          "maximum": 50,
+          "description": "Maximum number of issues to enhance with AI per scan (to control API costs)"
+        },
+        "go5StyleGuardian.aiContextLines": {
+          "type": "number",
+          "default": 5,
+          "minimum": 2,
+          "maximum": 20,
+          "description": "Number of lines of code context to send to AI around the issue"
+        },
+        "go5StyleGuardian.gitHook.autoInstall": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically install pre-commit hook when opening a workspace"
+        },
+        "go5StyleGuardian.gitHook.blockOnCritical": {
+          "type": "boolean",
+          "default": true,
+          "description": "Block commits if critical issues are found"
+        },
+        "go5StyleGuardian.gitHook.blockOnError": {
+          "type": "boolean",
+          "default": false,
+          "description": "Block commits if any errors are found (less strict than critical)"
+        },
+        "go5StyleGuardian.gitHook.showWarnings": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show warnings during commit (won't block commit)"
+        },
+        "go5StyleGuardian.componentRegistry.autoRebuild": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically rebuild Component Registry when files change"
+        },
+        "go5StyleGuardian.componentRegistry.rebuildDelay": {
+          "type": "number",
+          "default": 2000,
+          "minimum": 500,
+          "maximum": 10000,
+          "description": "Delay in milliseconds before rebuilding Component Registry after file changes"
         }
       }
     }
@@ -134,5 +238,7 @@
     "eslint": "^8.54.0",
     "typescript": "^5.3.3"
   },
-  "dependencies": {}
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1"
+  }
 }

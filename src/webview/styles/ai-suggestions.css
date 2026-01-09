@@ -1,0 +1,482 @@
+/* AI Suggestion styles for Go5 Style Guardian webview - Modern Collapsible Design */
+
+/* AI Suggestion Toggle Button */
+.ai-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    background: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    border: 1px solid var(--vscode-button-background);
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-top: 8px;
+}
+
+.ai-toggle:hover {
+    background: var(--vscode-button-hoverBackground);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.ai-toggle-icon {
+    display: inline-block;
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 4px solid currentColor;
+    transition: transform 0.2s ease;
+}
+
+.ai-toggle.expanded .ai-toggle-icon {
+    transform: rotate(180deg);
+}
+
+/* Collapsible AI Panel */
+.ai-suggestion-panel {
+    margin-top: 12px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    overflow: auto;
+    transition: all 0.3s ease;
+    width: 100%;
+}
+
+.ai-suggestion-panel.collapsed {
+    display: none;
+}
+
+.ai-suggestion-panel.expanded {
+    display: block;
+}
+
+/* AI Panel Header */
+.ai-suggestion-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px;
+    background: rgba(88, 166, 255, 0.08);
+    border: 1px solid rgba(88, 166, 255, 0.2);
+    border-radius: 6px 6px 0 0;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.ai-suggestion-header:hover {
+    background: rgba(88, 166, 255, 0.12);
+}
+
+.ai-suggestion-header.collapsed {
+    border-radius: 6px;
+}
+
+.ai-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(88, 166, 255, 0.15);
+    color: #58a6ff;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    border: 1px solid rgba(88, 166, 255, 0.3);
+}
+
+/* AI Content Container */
+.ai-suggestion-content {
+    padding: 20px;
+    background: var(--surface-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    max-height: none;
+    overflow-y: auto;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* AI Suggestion Preview (shown when collapsed) */
+.ai-preview {
+    padding: 6px 8px;
+    font-size: 12px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-style: italic;
+}
+
+.ai-explanation {
+    margin-bottom: 12px;
+    color: var(--text-primary);
+    line-height: 1.6;
+    font-size: 12px;
+}
+
+/* Text Highlighting Styles for Better Readability */
+.ai-explanation strong,
+.ai-explanation .highlight-text {
+    font-weight: 700;
+    color: var(--vscode-textLink-foreground);
+}
+
+.ai-explanation .highlight-important {
+    padding: 2px 6px;
+    background: rgba(88, 166, 255, 0.15);
+    border-radius: 3px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.ai-explanation .highlight-warning {
+    padding: 2px 6px;
+    background: rgba(245, 158, 11, 0.15);
+    border-radius: 3px;
+    font-weight: 600;
+    color: #f59e0b;
+}
+
+.ai-explanation .highlight-success {
+    padding: 2px 6px;
+    background: rgba(34, 197, 94, 0.15);
+    border-radius: 3px;
+    font-weight: 600;
+    color: #22c55e;
+}
+
+.ai-explanation ul,
+.ai-explanation ol {
+    margin: 8px 0;
+    padding-left: 20px;
+}
+
+.ai-explanation li {
+    margin: 4px 0;
+    line-height: 1.6;
+}
+
+.ai-explanation li strong {
+    color: var(--text-primary);
+}
+
+.ai-explanation p {
+    margin: 8px 0;
+}
+
+/* Improved Code Diff Layout */
+.ai-code-diff {
+    margin: 12px 0;
+}
+
+.ai-code-tabs {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--divider);
+}
+
+.ai-code-tab {
+    padding: 4px 12px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.ai-code-tab:hover {
+    color: var(--text-secondary);
+    background: var(--surface-bg);
+}
+
+.ai-code-tab.active {
+    color: var(--vscode-textLink-foreground);
+    border-bottom-color: var(--vscode-textLink-foreground);
+}
+
+.ai-code-content {
+    position: relative;
+    background: var(--surface-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.ai-code-block {
+    padding: 12px;
+    overflow-x: auto;
+    font-family: "SF Mono", Monaco, "Cascadia Code", monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    white-space: pre;
+    max-height: 500px;
+}
+
+.ai-code-block.original {
+    background: rgba(248, 81, 73, 0.05);
+    border-left: 3px solid #f85149;
+}
+
+.ai-code-block.suggested {
+    background: rgba(63, 185, 80, 0.05);
+    border-left: 3px solid #3fb950;
+}
+
+/* Copy Button */
+.ai-copy-btn {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    padding: 4px 8px;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+    opacity: 0;
+    transition: all 0.2s ease;
+}
+
+.ai-code-content:hover .ai-copy-btn {
+    opacity: 1;
+}
+
+.ai-copy-btn:hover {
+    background: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    border-color: var(--vscode-button-background);
+}
+
+/* AI Reasoning Section */
+.ai-reasoning {
+    margin-top: 12px;
+    padding: 8px;
+    background: rgba(88, 166, 255, 0.05);
+    border-left: 3px solid #58a6ff;
+    color: var(--text-secondary);
+    font-size: 11px;
+    line-height: 1.5;
+    border-radius: 4px;
+}
+
+.ai-reasoning-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+/* AI References - Enhanced for Better Visibility */
+.ai-references {
+    margin-top: 12px;
+    padding: 12px;
+    background: rgba(139, 92, 246, 0.08);
+    border: 1px solid rgba(139, 92, 246, 0.25);
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.ai-references-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #8b5cf6;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.ai-references-title::before {
+    content: "📚";
+    font-size: 14px;
+}
+
+.ai-reference-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.ai-reference-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    font-size: 12px;
+    background: var(--card-bg);
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+}
+
+.ai-reference-item:hover {
+    background: var(--surface-bg);
+    border-color: rgba(139, 92, 246, 0.3);
+    transform: translateX(2px);
+}
+
+.ai-reference-item::before {
+    content: "→";
+    color: #8b5cf6;
+    font-weight: 700;
+    font-size: 14px;
+}
+
+.ai-reference-link {
+    color: var(--vscode-textLink-foreground);
+    text-decoration: none;
+    transition: all 0.2s ease;
+    font-weight: 500;
+}
+
+.ai-reference-link:hover {
+    text-decoration: underline;
+    color: #8b5cf6;
+}
+
+/* Alternative Suggestions */
+.ai-alternatives {
+    margin-top: 12px;
+    padding: 8px;
+    background: rgba(251, 133, 0, 0.05);
+    border: 1px solid rgba(251, 133, 0, 0.2);
+    border-radius: 4px;
+}
+
+.ai-alternatives-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: #fb8500;
+    margin-bottom: 6px;
+}
+
+.ai-alternative-item {
+    padding: 4px 0;
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.ai-alternative-package {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-right: 4px;
+}
+
+/* AI Actions */
+.ai-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--divider);
+}
+
+.ai-actions .btn {
+    flex: 1;
+}
+
+/* AI Suggestion Request */
+.ai-suggestion-request {
+    padding: 12px;
+    text-align: center;
+    background: var(--surface-bg);
+    border: 1px dashed var(--card-border);
+    border-radius: 6px;
+    margin-top: 8px;
+}
+
+/* Loading State */
+.ai-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.ai-loading::before {
+    content: "";
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    margin-right: 8px;
+    border: 2px solid var(--card-border);
+    border-top-color: var(--vscode-textLink-foreground);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Confidence Indicators */
+.ai-confidence-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 8px;
+}
+
+.ai-confidence-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-muted);
+}
+
+.ai-confidence-indicator.high .ai-confidence-dot:nth-child(1),
+.ai-confidence-indicator.high .ai-confidence-dot:nth-child(2),
+.ai-confidence-indicator.high .ai-confidence-dot:nth-child(3) {
+    background: #3fb950;
+}
+
+.ai-confidence-indicator.medium .ai-confidence-dot:nth-child(1),
+.ai-confidence-indicator.medium .ai-confidence-dot:nth-child(2) {
+    background: #fb8500;
+}
+
+.ai-confidence-indicator.low .ai-confidence-dot:nth-child(1) {
+    background: #f85149;
+}
+
+/* Mobile Responsive */
+@media (max-width: 480px) {
+    .ai-suggestion-content {
+        padding: 8px;
+        max-height: 300px;
+    }
+
+    .ai-code-block {
+        font-size: 10px;
+        max-height: 150px;
+    }
+
+    .ai-actions {
+        flex-direction: column;
+    }
+
+    .ai-actions .btn {
+        width: 100%;
+    }
+}

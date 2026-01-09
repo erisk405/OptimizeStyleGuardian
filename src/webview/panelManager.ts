@@ -1,12 +1,21 @@
 import * as vscode from "vscode";
 import * as path from "path";
-import { AnalysisResult } from "../types";
+import { AnalysisResult, ImportAnalysisIssue } from "../types";
+import { IssueEnhancer } from "../services/issueEnhancer";
+import { AnthropicService } from "../services/anthropicService";
+import { ApiKeyManager } from "../config/apiKeyManager";
+import { ComponentRegistry } from "../services/componentRegistry";
 
 export class PanelManager {
   private panel: vscode.WebviewPanel | undefined;
   private currentResults: AnalysisResult | undefined;
+  private issueEnhancer: IssueEnhancer | undefined;
 
-  constructor(private context: vscode.ExtensionContext) {}
+  constructor(
+    private context: vscode.ExtensionContext,
+    private apiKeyManager: ApiKeyManager,
+    private componentRegistry?: ComponentRegistry,
+  ) {}
 
   public showPanel() {
     if (this.panel) {
@@ -36,6 +45,9 @@ export class PanelManager {
         retainContextWhenHidden: true,
         localResourceRoots: [
           vscode.Uri.file(path.join(this.context.extensionPath, "media")),
+          vscode.Uri.file(
+            path.join(this.context.extensionPath, "src", "webview", "styles"),
+          ),
         ],
       },
     );
@@ -44,13 +56,24 @@ export class PanelManager {
 
     // Handle messages from webview
     this.panel.webview.onDidReceiveMessage(
-      (message) => {
+      async (message) => {
         switch (message.type) {
           case "goToCode":
             this.goToCode(message.file, message.line, message.column);
             break;
           case "applyFix":
             this.applyFix(message.issueId, message.fixType);
+            break;
+          case "applyAiFix":
+            this.applyAiFix(
+              message.file,
+              message.startLine,
+              message.endLine,
+              message.suggestedCode,
+            );
+            break;
+          case "requestImportSuggestion":
+            await this.requestImportSuggestion(message.importIndex);
             break;
           case "ready":
             // Webview is ready, send current results if available
@@ -90,11 +113,8 @@ export class PanelManager {
     try {
       console.log("goToCode received:", { file, line, column });
 
-      // Normalize the file path (remove double backslashes)
-      const normalizedPath = file.replace(/\\\\/g, "\\");
-      console.log("Normalized path:", normalizedPath);
-
-      const document = await vscode.workspace.openTextDocument(normalizedPath);
+      // Use the file path as-is - VSCode handles both forward and backslashes
+      const document = await vscode.workspace.openTextDocument(file);
       const editor = await vscode.window.showTextDocument(
         document,
         vscode.ViewColumn.One,
@@ -110,7 +130,7 @@ export class PanelManager {
         vscode.TextEditorRevealType.InCenter,
       );
 
-      console.log("Successfully navigated to:", normalizedPath, "line:", line);
+      console.log("Successfully navigated to:", file, "line:", line);
     } catch (error) {
       console.error("Error opening file:", error);
       vscode.window.showErrorMessage(
@@ -124,231 +144,179 @@ export class PanelManager {
     vscode.window.showInformationMessage("Auto-fix feature coming soon!");
   }
 
+  private async applyAiFix(
+    file: string,
+    startLine: number,
+    endLine: number,
+    suggestedCode: string,
+  ) {
+    try {
+      console.log("Applying AI fix:", { file, startLine, endLine });
+
+      // Normalize the file path
+      const normalizedPath = file.replace(/\\\\/g, "\\");
+
+      // Open the document
+      const document = await vscode.workspace.openTextDocument(normalizedPath);
+      const editor = await vscode.window.showTextDocument(
+        document,
+        vscode.ViewColumn.One,
+      );
+
+      // Create edit
+      const edit = new vscode.WorkspaceEdit();
+
+      // Calculate range (lines are 0-indexed in VSCode API)
+      const startPos = new vscode.Position(Math.max(0, startLine - 1), 0);
+      const endPos = new vscode.Position(
+        Math.max(0, endLine - 1),
+        document.lineAt(Math.max(0, endLine - 1)).text.length,
+      );
+      const range = new vscode.Range(startPos, endPos);
+
+      // Replace the range with suggested code
+      edit.replace(document.uri, range, suggestedCode);
+
+      // Apply the edit
+      const success = await vscode.workspace.applyEdit(edit);
+
+      if (success) {
+        // Show success message
+        vscode.window.showInformationMessage(
+          "✓ AI suggestion applied successfully!",
+        );
+
+        // Move cursor to the changed location
+        const newPosition = new vscode.Position(Math.max(0, startLine - 1), 0);
+        editor.selection = new vscode.Selection(newPosition, newPosition);
+        editor.revealRange(
+          new vscode.Range(newPosition, newPosition),
+          vscode.TextEditorRevealType.InCenter,
+        );
+      } else {
+        vscode.window.showErrorMessage("Failed to apply AI suggestion");
+      }
+    } catch (error) {
+      console.error("Error applying AI fix:", error);
+      vscode.window.showErrorMessage(
+        `Failed to apply AI fix: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  private async requestImportSuggestion(importIndex: number) {
+    try {
+      console.log("Requesting AI suggestion for import:", importIndex);
+
+      if (!this.currentResults || !this.currentResults.imports) {
+        vscode.window.showErrorMessage("No import data available");
+        return;
+      }
+
+      const importIssue = this.currentResults.imports[importIndex];
+      if (!importIssue) {
+        vscode.window.showErrorMessage("Import not found");
+        return;
+      }
+
+      // Get workspace root
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+      if (!workspaceFolders || workspaceFolders.length === 0) {
+        vscode.window.showErrorMessage("No workspace folder found");
+        return;
+      }
+      const workspaceRoot = workspaceFolders[0].uri.fsPath;
+
+      // Initialize IssueEnhancer if needed
+      if (!this.issueEnhancer) {
+        const config = vscode.workspace.getConfiguration("go5StyleGuardian");
+        const apiKey = await this.apiKeyManager.getApiKey();
+
+        if (!apiKey) {
+          vscode.window.showErrorMessage(
+            "Anthropic API key not configured. Please run 'Go5: Configure API Key' command.",
+          );
+          return;
+        }
+
+        const aiModel = config.get<string>(
+          "aiModel",
+          "claude-sonnet-4-5-20250929",
+        );
+        const maxIssues = config.get<number>("aiMaxIssuesPerScan", 10);
+        const contextLines = config.get<number>("aiContextLines", 5);
+
+        const anthropicService = new AnthropicService(apiKey, aiModel);
+        this.issueEnhancer = new IssueEnhancer(
+          anthropicService,
+          maxIssues,
+          contextLines,
+          this.componentRegistry,
+        );
+      }
+
+      // Request AI suggestion
+      vscode.window.showInformationMessage("Requesting AI suggestion...");
+
+      const suggestion = await this.issueEnhancer.enhanceImportIssue(
+        importIssue,
+        workspaceRoot,
+      );
+
+      if (suggestion) {
+        // Update the import with the suggestion
+        importIssue.aiSuggestion = suggestion;
+
+        // Update the results and refresh the webview
+        this.currentResults.imports[importIndex] = importIssue;
+
+        if (this.panel) {
+          this.panel.webview.postMessage({
+            type: "updateResults",
+            data: this.currentResults,
+          });
+        }
+
+        vscode.window.showInformationMessage("✓ AI suggestion received!");
+      } else {
+        vscode.window.showWarningMessage("Could not generate AI suggestion");
+      }
+    } catch (error) {
+      console.error("Error requesting AI suggestion:", error);
+      vscode.window.showErrorMessage(
+        `Failed to get AI suggestion: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
   private getWebviewContent(): string {
+    // Get URIs for CSS files
+    const stylesPath = vscode.Uri.file(
+      path.join(this.context.extensionPath, "src", "webview", "styles"),
+    );
+
+    const mainCssUri = this.panel!.webview.asWebviewUri(
+      vscode.Uri.file(path.join(stylesPath.fsPath, "main.css")),
+    );
+    const componentsCssUri = this.panel!.webview.asWebviewUri(
+      vscode.Uri.file(path.join(stylesPath.fsPath, "components.css")),
+    );
+    const aiSuggestionsCssUri = this.panel!.webview.asWebviewUri(
+      vscode.Uri.file(path.join(stylesPath.fsPath, "ai-suggestions.css")),
+    );
+
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Go5 Style Guardian</title>
-    <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: var(--vscode-font-family);
-            font-size: var(--vscode-font-size);
-            color: var(--vscode-foreground);
-            background-color: var(--vscode-editor-background);
-            padding: 20px;
-        }
-
-        h1 {
-            font-size: 24px;
-            margin-bottom: 20px;
-            color: var(--vscode-foreground);
-        }
-
-        .tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            border-bottom: 1px solid var(--vscode-panel-border);
-        }
-
-        .tab {
-            padding: 10px 20px;
-            cursor: pointer;
-            background: transparent;
-            border: none;
-            color: var(--vscode-foreground);
-            opacity: 0.6;
-            font-size: 14px;
-            border-bottom: 2px solid transparent;
-            transition: all 0.2s;
-        }
-
-        .tab:hover {
-            opacity: 0.8;
-        }
-
-        .tab.active {
-            opacity: 1;
-            border-bottom-color: var(--vscode-button-background);
-        }
-
-        .tab-content {
-            display: none;
-        }
-
-        .tab-content.active {
-            display: block;
-        }
-
-        .summary {
-            background: var(--vscode-editor-inactiveSelectionBackground);
-            padding: 15px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            display: flex;
-            gap: 30px;
-            flex-wrap: wrap;
-        }
-
-        .summary-item {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .summary-label {
-            font-size: 12px;
-            opacity: 0.7;
-            margin-bottom: 5px;
-        }
-
-        .summary-value {
-            font-size: 20px;
-            font-weight: bold;
-        }
-
-        .summary-value.critical {
-            color: var(--vscode-errorForeground);
-        }
-
-        .summary-value.warning {
-            color: var(--vscode-list-warningForeground);
-        }
-
-        .issue-list {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        .issue-card {
-            background: var(--vscode-editor-inactiveSelectionBackground);
-            padding: 15px;
-            border-radius: 5px;
-            border-left: 3px solid;
-        }
-
-        .issue-card.critical {
-            border-left-color: var(--vscode-errorForeground);
-        }
-
-        .issue-card.warning {
-            border-left-color: var(--vscode-list-warningForeground);
-        }
-
-        .issue-card.info {
-            border-left-color: var(--vscode-notificationsInfoIcon-foreground);
-        }
-
-        .issue-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 10px;
-        }
-
-        .issue-title {
-            font-weight: bold;
-            font-size: 14px;
-        }
-
-        .severity-badge {
-            padding: 2px 8px;
-            border-radius: 3px;
-            font-size: 11px;
-            font-weight: bold;
-            text-transform: uppercase;
-        }
-
-        .severity-badge.critical {
-            background: var(--vscode-errorForeground);
-            color: var(--vscode-editor-background);
-        }
-
-        .severity-badge.warning {
-            background: var(--vscode-list-warningForeground);
-            color: var(--vscode-editor-background);
-        }
-
-        .severity-badge.info {
-            background: var(--vscode-notificationsInfoIcon-foreground);
-            color: var(--vscode-editor-background);
-        }
-
-        .issue-details {
-            font-size: 13px;
-            margin-bottom: 10px;
-            opacity: 0.9;
-        }
-
-        .issue-location {
-            font-size: 12px;
-            opacity: 0.7;
-            margin-bottom: 10px;
-            font-family: var(--vscode-editor-font-family);
-        }
-
-        .issue-actions {
-            display: flex;
-            gap: 10px;
-        }
-
-        .btn {
-            padding: 6px 12px;
-            border: none;
-            border-radius: 3px;
-            cursor: pointer;
-            font-size: 12px;
-            transition: opacity 0.2s;
-        }
-
-        .btn:hover {
-            opacity: 0.8;
-        }
-
-        .btn-primary {
-            background: var(--vscode-button-background);
-            color: var(--vscode-button-foreground);
-        }
-
-        .btn-secondary {
-            background: var(--vscode-button-secondaryBackground);
-            color: var(--vscode-button-secondaryForeground);
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            opacity: 0.6;
-        }
-
-        .empty-state-icon {
-            font-size: 48px;
-            margin-bottom: 20px;
-        }
-
-        .empty-state-text {
-            font-size: 16px;
-        }
-
-        code {
-            background: var(--vscode-textCodeBlock-background);
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-family: var(--vscode-editor-font-family);
-            font-size: 12px;
-        }
-    </style>
+    <link rel="stylesheet" href="${mainCssUri}">
+    <link rel="stylesheet" href="${componentsCssUri}">
+    <link rel="stylesheet" href="${aiSuggestionsCssUri}">
 </head>
 <body>
-    <h1>🛡️ Go5 Style Guardian</h1>
+    <h1>Go5 Style Guardian</h1>
 
     <div id="summary" class="summary" style="display: none;">
         <div class="summary-item">
@@ -373,26 +341,34 @@ export class PanelManager {
         <button class="tab active" data-tab="style-health">Style Health</button>
         <button class="tab" data-tab="design-system">Design System</button>
         <button class="tab" data-tab="performance">Performance</button>
+        <button class="tab" data-tab="imports">Imports</button>
     </div>
 
     <div id="style-health" class="tab-content active">
         <div class="empty-state">
-            <div class="empty-state-icon">🎨</div>
+            <div class="empty-state-icon"></div>
             <div class="empty-state-text">Run a scan to see style health issues</div>
         </div>
     </div>
 
     <div id="design-system" class="tab-content">
         <div class="empty-state">
-            <div class="empty-state-icon">📐</div>
+            <div class="empty-state-icon"></div>
             <div class="empty-state-text">Run a scan to see design system recommendations</div>
         </div>
     </div>
 
     <div id="performance" class="tab-content">
         <div class="empty-state">
-            <div class="empty-state-icon">⚡</div>
+            <div class="empty-state-icon"></div>
             <div class="empty-state-text">Run a scan to see performance issues</div>
+        </div>
+    </div>
+
+    <div id="imports" class="tab-content">
+        <div class="empty-state">
+            <div class="empty-state-icon"></div>
+            <div class="empty-state-text">Run a scan to see import analysis</div>
         </div>
     </div>
 
@@ -433,12 +409,13 @@ export class PanelManager {
             updateStyleHealthTab(results.duplicates);
             updateDesignSystemTab(results.designSystem);
             updatePerformanceTab(results.performance);
+            updateImportsTab(results.imports || []);
         }
 
         function updateStyleHealthTab(issues) {
             const container = document.getElementById('style-health');
             if (issues.length === 0) {
-                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✅</div><div class="empty-state-text">No duplicate styles found!</div></div>';
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon"></div><div class="empty-state-text">No duplicate styles found!</div></div>';
                 return;
             }
 
@@ -449,7 +426,8 @@ export class PanelManager {
                     details: getStyleIssueDetails(issue),
                     file: issue.file,
                     line: issue.line,
-                    column: issue.column
+                    column: issue.column,
+                    aiSuggestion: issue.aiSuggestion
                 })
             ).join('') + '</div>';
         }
@@ -457,7 +435,7 @@ export class PanelManager {
         function updateDesignSystemTab(issues) {
             const container = document.getElementById('design-system');
             if (issues.length === 0) {
-                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✅</div><div class="empty-state-text">Design system compliance looks good!</div></div>';
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon"></div><div class="empty-state-text">Design system compliance looks good!</div></div>';
                 return;
             }
 
@@ -469,7 +447,8 @@ export class PanelManager {
                     file: issue.file,
                     line: issue.line,
                     column: issue.column,
-                    suggestion: issue.suggested
+                    suggestion: issue.suggested,
+                    aiSuggestion: issue.aiSuggestion
                 })
             ).join('') + '</div>';
         }
@@ -477,7 +456,7 @@ export class PanelManager {
         function updatePerformanceTab(issues) {
             const container = document.getElementById('performance');
             if (issues.length === 0) {
-                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✅</div><div class="empty-state-text">No performance issues detected!</div></div>';
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon"></div><div class="empty-state-text">No performance issues detected!</div></div>';
                 return;
             }
 
@@ -488,9 +467,126 @@ export class PanelManager {
                     details: issue.recommendation,
                     file: issue.file,
                     line: issue.line,
-                    column: issue.column
+                    column: issue.column,
+                    aiSuggestion: issue.aiSuggestion
                 })
             ).join('') + '</div>';
+        }
+
+        function updateImportsTab(issues) {
+            const container = document.getElementById('imports');
+            currentImports = issues; // Store for AI suggestion requests
+
+            if (issues.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon"></div><div class="empty-state-text">No imports found or all imports are optimal!</div></div>';
+                return;
+            }
+
+            container.innerHTML = '<div class="issue-list">' + issues.map((issue, index) => {
+                const sizeInfo = issue.sizeKb !== undefined && issue.sizeKb !== null
+                    ? \`<span class="size-badge">\${issue.sizeKb} KB</span>\`
+                    : '<span class="size-badge external">External Package</span>';
+
+                const importedItemsText = issue.importedItems.join(', ');
+
+                const title = \`Import from <code>\${escapeHtml(issue.source)}</code> \${sizeInfo}\`;
+                const details = \`Imported items: <strong>\${escapeHtml(importedItemsText)}</strong>\`;
+
+                return createImportCard({
+                    issue: issue,
+                    index: index,
+                    severity: issue.severity,
+                    title: title,
+                    details: details,
+                    file: issue.file,
+                    line: issue.line
+                });
+            }).join('') + '</div>';
+        }
+
+        function createImportCard(data) {
+            const { issue, index, severity, title, details, file, line } = data;
+
+            const severityClass = severity === 'warning' ? 'warning' : severity === 'error' ? 'critical' : 'info';
+
+            return \`
+                <div class="issue-card \${severityClass}" data-import-index="\${index}">
+                    <div class="issue-header">
+                        <div class="issue-title">\${title}</div>
+                        <span class="severity-badge \${severityClass}">\${severity}</span>
+                    </div>
+                    <div class="issue-details">\${details}</div>
+                    <div class="issue-location">\${escapeHtml(file)}:\${line}</div>
+                    <div class="issue-actions">
+                        <button class="btn btn-secondary" onclick="goToCode('\${escapeJsString(file)}', \${line})">Go to Code</button>
+                        \${issue.aiSuggestion ? \`
+                            <button class="ai-toggle" onclick="toggleAiPanel(\${index})" id="ai-toggle-\${index}">
+                                <span class="ai-toggle-icon"></span>
+                                AI: \${issue.aiSuggestion.optimizationType.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}\${issue.aiSuggestion.potentialSavings ? \` (-\${issue.aiSuggestion.potentialSavings}KB)\` : ''}
+                            </button>
+                        \` : \`
+                            <button class="btn btn-ai" onclick="requestImportSuggestion(\${index})" id="suggest-btn-\${index}">
+                                Get AI Suggestion
+                            </button>
+                        \`}
+                    </div>
+                    \${issue.aiSuggestion ? \`
+                        <div class="ai-suggestion-panel collapsed" id="ai-panel-\${index}">
+                            <div class="ai-suggestion-content" style="display: none;" id="ai-content-\${index}">
+                                <div class="ai-explanation">\${escapeHtml(issue.aiSuggestion.explanation)}</div>
+
+                                <div class="ai-code-diff">
+                                    <div class="ai-code-tabs">
+                                        <button class="ai-code-tab active" onclick="showCodeTab(\${index}, 'original')">Current Code</button>
+                                        <button class="ai-code-tab" onclick="showCodeTab(\${index}, 'suggested')">Suggested Code</button>
+                                    </div>
+                                    <div class="ai-code-content">
+                                        <button class="ai-copy-btn" onclick="copyCode(\${index}, 'suggested')">Copy</button>
+                                        <pre class="ai-code-block original" id="code-original-\${index}"><code>\${escapeHtml(issue.aiSuggestion.codeChange.original)}</code></pre>
+                                        <pre class="ai-code-block suggested" id="code-suggested-\${index}" style="display: none;"><code>\${escapeHtml(issue.aiSuggestion.codeChange.suggested)}</code></pre>
+                                    </div>
+                                </div>
+
+                                <div class="ai-reasoning">
+                                    <div class="ai-reasoning-title">Reasoning</div>
+                                    \${escapeHtml(issue.aiSuggestion.reasoning)}
+                                </div>
+
+                                \${issue.aiSuggestion.references ? \`
+                                    <div class="ai-references">
+                                        <div class="ai-references-title">References</div>
+                                        <ul class="ai-reference-list">
+                                            \${issue.aiSuggestion.references.map(ref => \`
+                                                <li class="ai-reference-item">
+                                                    \${ref.url ?
+                                                        \`<a href="\${escapeHtml(ref.url)}" class="ai-reference-link">\${escapeHtml(ref.title)}</a>\` :
+                                                        escapeHtml(ref.title)
+                                                    }
+                                                </li>
+                                            \`).join('')}
+                                        </ul>
+                                    </div>
+                                \` : ''}
+
+                                \${issue.aiSuggestion.alternativePackage ? \`
+                                    <div class="ai-alternatives">
+                                        <div class="ai-alternatives-title">Alternative Package</div>
+                                        <div class="ai-alternative-item">
+                                            <span class="ai-alternative-package">\${escapeHtml(issue.aiSuggestion.alternativePackage)}</span>
+                                            - Consider using this lighter alternative
+                                        </div>
+                                    </div>
+                                \` : ''}
+
+                                <div class="ai-actions">
+                                    <button class="btn btn-primary" onclick="applyImportSuggestion(\${index})">Apply Changes</button>
+                                    <button class="btn btn-secondary" onclick="dismissSuggestion(\${index})">Dismiss</button>
+                                </div>
+                            </div>
+                        </div>
+                    \` : ''}
+                </div>
+            \`;
         }
 
         function escapeHtml(text) {
@@ -501,6 +597,24 @@ export class PanelManager {
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#039;');
+        }
+
+        function escapeJsString(text) {
+            if (!text) return '';
+            var result = '';
+            for (var i = 0; i < text.length; i++) {
+                var c = text.charAt(i);
+                switch (c) {
+                    case '\\\\': result += '\\\\\\\\'; break;
+                    case "'": result += "\\\\'"; break;
+                    case '"': result += '\\\\"'; break;
+                    case '\\n': result += '\\\\n'; break;
+                    case '\\r': result += '\\\\r'; break;
+                    case '\\t': result += '\\\\t'; break;
+                    default: result += c;
+                }
+            }
+            return result;
         }
 
         function getStyleIssueTitle(issue) {
@@ -539,9 +653,40 @@ export class PanelManager {
         }
 
         function createIssueCard(issue) {
-            const displayFile = issue.file.replace(/\\\\/g, '\\\\');
-            const fileAttr = issue.file.replace(/"/g, '&quot;').replace(/\\\\/g, '\\\\');
-            const fixButton = issue.suggestion ? '<button class="btn btn-secondary" data-action="fix">🔧 Apply Fix</button>' : '';
+            // Use forward slashes for display (cross-platform)
+            const displayFile = issue.file.split('\\\\').join('/');
+            // For data attributes, just escape quotes - don't double-escape backslashes
+            const fileAttr = issue.file.split('"').join('&quot;');
+            const fixButton = issue.suggestion ? '<button class="btn btn-secondary" data-action="fix">Apply Fix</button>' : '';
+
+            // AI Suggestion section
+            let aiSuggestionHtml = '';
+            if (issue.aiSuggestion) {
+                const ai = issue.aiSuggestion;
+                const confidenceBadge = '<span class="confidence-badge ' + ai.confidence + '">' + ai.confidence.toUpperCase() + '</span>';
+
+                aiSuggestionHtml = '<div class="ai-suggestion">' +
+                    '<div class="ai-badge">AI Suggestion' + confidenceBadge + '</div>' +
+                    '<div class="ai-explanation">' + escapeHtml(ai.explanation) + '</div>' +
+                    '<div class="code-diff">' +
+                    '<div class="code-block before">' +
+                    '<span class="label">Current Code:</span>' +
+                    '<pre>' + escapeHtml(ai.codeChange.original) + '</pre>' +
+                    '</div>' +
+                    '<div class="code-block after">' +
+                    '<span class="label">Suggested Code:</span>' +
+                    '<pre>' + escapeHtml(ai.codeChange.suggested) + '</pre>' +
+                    '</div>' +
+                    '</div>' +
+                    '<div class="ai-reasoning">Reasoning: ' + escapeHtml(ai.reasoning) + '</div>' +
+                    '<button class="btn btn-primary" data-action="apply-ai" data-file="' + fileAttr + '" ' +
+                    'data-start-line="' + ai.codeChange.startLine + '" ' +
+                    'data-end-line="' + ai.codeChange.endLine + '" ' +
+                    'data-suggested-code="' + escapeHtml(ai.codeChange.suggested).split('"').join('&quot;') + '">' +
+                    'Apply AI Fix' +
+                    '</button>' +
+                    '</div>';
+            }
 
             return '<div class="issue-card ' + issue.severity + '">' +
                 '<div class="issue-header">' +
@@ -552,11 +697,121 @@ export class PanelManager {
                 '<div class="issue-location">' + displayFile + ':' + (issue.line || '?') + (issue.column ? ':' + issue.column : '') + '</div>' +
                 '<div class="issue-actions">' +
                 '<button class="btn btn-primary" data-action="goto" data-file="' + fileAttr + '" data-line="' + (issue.line || 0) + '" data-column="' + (issue.column || 0) + '">' +
-                '🔍 Go to Code' +
+                'Go to Code' +
                 '</button>' +
                 fixButton +
                 '</div>' +
+                aiSuggestionHtml +
                 '</div>';
+        }
+
+        // Store current imports for AI suggestion requests
+        let currentImports = [];
+
+        function requestImportSuggestion(index) {
+            const btn = document.getElementById(\`suggest-btn-\${index}\`);
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = 'Requesting AI Suggestion...';
+            }
+
+            vscode.postMessage({
+                type: 'requestImportSuggestion',
+                importIndex: index
+            });
+        }
+
+        function applyImportSuggestion(index) {
+            const issue = currentImports[index];
+            if (!issue || !issue.aiSuggestion) return;
+
+            const suggestion = issue.aiSuggestion;
+
+            vscode.postMessage({
+                type: 'applyAiFix',
+                file: issue.file,
+                startLine: suggestion.codeChange.startLine,
+                endLine: suggestion.codeChange.endLine,
+                suggestedCode: suggestion.codeChange.suggested
+            });
+        }
+
+        function dismissSuggestion(index) {
+            const card = document.querySelector(\`[data-import-index="\${index}"]\`);
+            if (card) {
+                const suggestionPanel = card.querySelector('.ai-suggestion-panel');
+                if (suggestionPanel) {
+                    suggestionPanel.style.display = 'none';
+                }
+            }
+        }
+
+        function goToCode(file, line, column) {
+            vscode.postMessage({
+                type: 'goToCode',
+                file: file,
+                line: line,
+                column: column || 0
+            });
+        }
+
+        // Toggle AI Panel collapse/expand
+        function toggleAiPanel(index) {
+            const panel = document.getElementById(\`ai-panel-\${index}\`);
+            const toggle = document.getElementById(\`ai-toggle-\${index}\`);
+            const content = document.getElementById(\`ai-content-\${index}\`);
+
+            if (panel.classList.contains('collapsed')) {
+                // Expand
+                panel.classList.remove('collapsed');
+                panel.classList.add('expanded');
+                toggle.classList.add('expanded');
+                content.style.display = 'block';
+            } else {
+                // Collapse
+                panel.classList.add('collapsed');
+                panel.classList.remove('expanded');
+                toggle.classList.remove('expanded');
+                content.style.display = 'none';
+            }
+        }
+
+        // Show code tab (original/suggested)
+        function showCodeTab(index, type) {
+            const originalCode = document.getElementById(\`code-original-\${index}\`);
+            const suggestedCode = document.getElementById(\`code-suggested-\${index}\`);
+            const tabs = document.querySelectorAll(\`#ai-panel-\${index} .ai-code-tab\`);
+
+            tabs.forEach(tab => tab.classList.remove('active'));
+
+            if (type === 'original') {
+                originalCode.style.display = 'block';
+                suggestedCode.style.display = 'none';
+                tabs[0].classList.add('active');
+            } else {
+                originalCode.style.display = 'none';
+                suggestedCode.style.display = 'block';
+                tabs[1].classList.add('active');
+            }
+        }
+
+        // Copy code to clipboard
+        function copyCode(index, type) {
+            const codeElement = type === 'original'
+                ? document.getElementById(\`code-original-\${index}\`)
+                : document.getElementById(\`code-suggested-\${index}\`);
+
+            if (codeElement) {
+                const code = codeElement.textContent;
+                navigator.clipboard.writeText(code).then(() => {
+                    const copyBtn = codeElement.parentElement.querySelector('.ai-copy-btn');
+                    const originalText = copyBtn.textContent;
+                    copyBtn.textContent = 'Copied!';
+                    setTimeout(() => {
+                        copyBtn.textContent = originalText;
+                    }, 2000);
+                });
+            }
         }
 
         function attachEventListeners() {
@@ -581,6 +836,23 @@ export class PanelManager {
                     console.log('Apply Fix clicked');
                     vscode.postMessage({
                         type: 'applyFix'
+                    });
+                }
+
+                if (target.tagName === 'BUTTON' && target.dataset.action === 'apply-ai') {
+                    const file = target.dataset.file;
+                    const startLine = parseInt(target.dataset.startLine) || 0;
+                    const endLine = parseInt(target.dataset.endLine) || 0;
+                    const suggestedCode = target.dataset.suggestedCode;
+
+                    console.log('Apply AI Fix clicked:', { file, startLine, endLine });
+
+                    vscode.postMessage({
+                        type: 'applyAiFix',
+                        file: file,
+                        startLine: startLine,
+                        endLine: endLine,
+                        suggestedCode: suggestedCode
                     });
                 }
             });
